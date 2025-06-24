@@ -1,0 +1,25 @@
+# Core dependencies
+fastapi==0.115.13
+uvicorn==0.34.3
+pydantic==2.11.7
+
+# Data ingestion dependencies
+youtube-transcript-api==1.1.0
+tweepy==4.16.0
+requests==2.32.4
+yt-dlp==2025.6.9
+
+# RAG and Vector Store dependencies
+langchain==0.3.26
+langchain-community==0.3.26
+langchain-openai==0.3.25
+openai==1.91.0
+psycopg2-binary==2.9.10
+
+# Testing dependencies
+pytest==8.4.1
+pytest-asyncio==1.0.0
+httpx==0.28.1
+
+# Additional dependencies that might be needed
+python-multipart>=0.0.5 
