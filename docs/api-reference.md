@@ -306,6 +306,78 @@ curl -s "http://localhost:8000/search?query=test" | jq '.'
 
 ---
 
+## Delete Vector Store Endpoint
+
+**Endpoint:** `DELETE /search`  
+**Purpose:** Delete all documents from the vector store
+
+### Expected Success Response
+
+```json
+{
+  "status": "success",
+  "message": "Successfully deleted 150 documents from vector store",
+  "deleted_count": 150,
+  "processing_time": "2.34s"
+}
+```
+
+### Error Response
+
+```json
+{
+  "status": "error",
+  "message": "Vector store not available",
+  "deleted_count": 0,
+  "processing_time": "0.01s"
+}
+```
+
+### Test Command
+
+```bash
+curl -X DELETE "http://localhost:8000/search" | jq '.'
+```
+
+---
+
+## Delete Knowledge Graph Endpoint
+
+**Endpoint:** `DELETE /graph`  
+**Purpose:** Delete all nodes and edges from the knowledge graph
+
+### Expected Success Response
+
+```json
+{
+  "status": "success",
+  "message": "Successfully deleted 45 nodes and 67 edges from knowledge graph",
+  "deleted_nodes": 45,
+  "deleted_edges": 67,
+  "processing_time": "1.23s"
+}
+```
+
+### Error Response
+
+```json
+{
+  "status": "error",
+  "message": "Failed to delete data from knowledge graph",
+  "deleted_nodes": 0,
+  "deleted_edges": 0,
+  "processing_time": "0.05s"
+}
+```
+
+### Test Command
+
+```bash
+curl -X DELETE "http://localhost:8000/graph" | jq '.'
+```
+
+---
+
 ## Error Responses
 
 ### Validation Error (422)

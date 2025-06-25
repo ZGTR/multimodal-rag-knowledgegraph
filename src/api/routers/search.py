@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
 from src.rag.temporal_search import get_temporal_search_service, TemporalSearchQuery, TemporalSearchResult
 from src.bootstrap.logger import get_logger
+from src.rag.vector_store import get_vectorstore
+import time
 
 router = APIRouter(prefix="/search", tags=["search"])
 logger = get_logger("api.search")
@@ -134,4 +136,55 @@ def get_search_stats():
         "search_success_rate": 0.0
     }
     
-    return stats 
+    return stats
+
+@router.delete("")
+def delete_all_documents() -> Dict[str, Any]:
+    """Delete all documents from the vector store."""
+    start_time = time.time()
+    try:
+        logger.info("Deleting all documents from vector store...")
+        vectorstore = get_vectorstore()
+        
+        if not vectorstore:
+            logger.error("Vector store not available")
+            return {
+                "status": "error",
+                "message": "Vector store not available",
+                "deleted_count": 0
+            }
+        
+        # Get count before deletion
+        before_count = vectorstore.get_document_count()
+        
+        # Delete all documents
+        success = vectorstore.delete_all()
+        
+        processing_time = time.time() - start_time
+        
+        if success:
+            logger.info(f"All documents deleted from vector store in {processing_time:.2f}s")
+            return {
+                "status": "success",
+                "message": f"Successfully deleted {before_count} documents from vector store",
+                "deleted_count": before_count,
+                "processing_time": f"{processing_time:.2f}s"
+            }
+        else:
+            logger.error(f"Failed to delete documents from vector store after {processing_time:.2f}s")
+            return {
+                "status": "error",
+                "message": "Failed to delete documents from vector store",
+                "deleted_count": 0,
+                "processing_time": f"{processing_time:.2f}s"
+            }
+            
+    except Exception as e:
+        processing_time = time.time() - start_time
+        logger.error(f"Delete operation failed after {processing_time:.2f}s: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "deleted_count": 0,
+            "processing_time": f"{processing_time:.2f}s"
+        } 

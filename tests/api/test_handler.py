@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 import json
+import time
 
 class TestIngestEndpoint:
     """Test cases for the /ingest endpoint"""
@@ -481,3 +482,30 @@ class TestAPIEndpoints:
         """Test that nonexistent endpoint returns 404"""
         response = client.get("/nonexistent")
         assert response.status_code == 404 
+
+class TestIngestAndEntitiesE2E:
+    """End-to-end test: ingest a video, then check that entities are populated."""
+    def test_ingest_and_entities_populated(self, client):
+        # Ingest a known video
+        video_id = "dQw4w9WgXcQ"
+        ingest_request = {"videos": [video_id]}
+        response = client.post("/ingest", json=ingest_request)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "queued"
+
+        # Simulate background task completion (in real test, you might mock or trigger the worker directly)
+        # Here, we poll /entities for up to 30 seconds
+        found_entity = False
+        for _ in range(30):
+            entities_response = client.get("/entities")
+            assert entities_response.status_code == 200
+            entities_data = entities_response.json()
+            if entities_data.get("count", 0) > 0:
+                # Check that at least one entity node is present
+                entity_nodes = [e for e in entities_data["entities"] if e.get("label") == "Entity" or e["properties"].get("node_type") == "Entity"]
+                if entity_nodes:
+                    found_entity = True
+                    break
+            time.sleep(1)
+        assert found_entity, "No entity nodes found in KG after ingestion" 

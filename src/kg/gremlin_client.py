@@ -4,6 +4,7 @@ from .entity_extraction import SpaCyEntityExtractor, FallbackEntityExtractor
 from .utils import get_first
 from typing import List, Dict, Any
 import logging
+import time
 try:
     from gremlin_python.driver import client, serializer
     from gremlin_python.structure.graph import Graph
@@ -218,3 +219,51 @@ class GremlinKG(BaseKnowledgeGraph):
         except Exception as e:
             logger.warning(f"Could not get facts for entity '{entity_name}': {e}")
         return facts
+
+    def delete_all(self) -> bool:
+        """Delete all nodes and edges from the knowledge graph."""
+        try:
+            logger.info("Deleting all nodes and edges from knowledge graph...")
+            start_time = time.time()
+            
+            # Delete all edges first
+            edge_query = "g.E().drop()"
+            self.gremlin_client._execute_query(edge_query)
+            logger.info("All edges deleted")
+            
+            # Delete all vertices
+            vertex_query = "g.V().drop()"
+            self.gremlin_client._execute_query(vertex_query)
+            logger.info("All vertices deleted")
+            
+            deletion_time = time.time() - start_time
+            logger.info(f"All data deleted from knowledge graph in {deletion_time:.2f}s")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to delete all data from knowledge graph: {e}")
+            return False
+
+    def get_node_count(self) -> int:
+        """Get the total number of nodes in the knowledge graph."""
+        try:
+            query = "g.V().count()"
+            result = self.gremlin_client._execute_query(query)
+            count = result[0] if result else 0
+            logger.debug(f"Knowledge graph contains {count} nodes")
+            return count
+        except Exception as e:
+            logger.error(f"Failed to get node count: {e}")
+            return 0
+
+    def get_edge_count(self) -> int:
+        """Get the total number of edges in the knowledge graph."""
+        try:
+            query = "g.E().count()"
+            result = self.gremlin_client._execute_query(query)
+            count = result[0] if result else 0
+            logger.debug(f"Knowledge graph contains {count} edges")
+            return count
+        except Exception as e:
+            logger.error(f"Failed to get edge count: {e}")
+            return 0

@@ -21,4 +21,19 @@ class BaseKnowledgeGraph(ABC):
 
     @abstractmethod
     def get_whole_graph(self) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def delete_all(self) -> bool:
+        """Delete all nodes and edges from the knowledge graph."""
+        pass
+
+    @abstractmethod
+    def get_node_count(self) -> int:
+        """Get the total number of nodes in the knowledge graph."""
+        pass
+
+    @abstractmethod
+    def get_edge_count(self) -> int:
+        """Get the total number of edges in the knowledge graph."""
         pass 

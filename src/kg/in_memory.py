@@ -99,4 +99,28 @@ class InMemoryKG(BaseKnowledgeGraph):
             "edges": edges,
             "total_nodes": len(nodes),
             "total_edges": len(edges)
-        } 
+        }
+
+    def delete_all(self) -> bool:
+        """Delete all nodes and edges from the knowledge graph."""
+        try:
+            print("Deleting all nodes and edges from in-memory knowledge graph...")
+            self.nodes.clear()
+            self.edges.clear()
+            print("All data deleted from in-memory knowledge graph")
+            return True
+        except Exception as e:
+            print(f"Failed to delete all data from in-memory knowledge graph: {e}")
+            return False
+
+    def get_node_count(self) -> int:
+        """Get the total number of nodes in the knowledge graph."""
+        count = len(self.nodes)
+        print(f"In-memory knowledge graph contains {count} nodes")
+        return count
+
+    def get_edge_count(self) -> int:
+        """Get the total number of edges in the knowledge graph."""
+        count = len(self.edges)
+        print(f"In-memory knowledge graph contains {count} edges")
+        return count 

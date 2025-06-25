@@ -122,6 +122,52 @@ class VectorStore:
             logger.error(f"Failed to search vector store: {e}")
             return []
 
+    def delete_all(self) -> bool:
+        """Delete all documents from the vector store."""
+        if self.vectorstore is None:
+            logger.error("Vector store not available")
+            return False
+            
+        try:
+            start_time = time.time()
+            logger.info("Deleting all documents from vector store...")
+            
+            # For PGVector, we need to delete from the collection
+            # This will delete all documents in the collection
+            self.vectorstore.delete_collection()
+            
+            # Recreate the collection
+            self.vectorstore = PGVector(
+                connection_string=settings.vectordb_uri,
+                embedding_function=self.embeddings,
+                collection_name="multimodal_rag"
+            )
+            
+            deletion_time = time.time() - start_time
+            logger.info(f"All documents deleted from vector store in {deletion_time:.2f}s")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to delete all documents from vector store: {e}")
+            return False
+
+    def get_document_count(self) -> int:
+        """Get the total number of documents in the vector store."""
+        if self.vectorstore is None:
+            logger.error("Vector store not available")
+            return 0
+            
+        try:
+            # For PGVector, we can count documents in the collection
+            # This is a simple approach - in production you might want a more efficient method
+            results = self.vectorstore.similarity_search("", k=10000)  # Get all documents
+            count = len(results)
+            logger.debug(f"Vector store contains {count} documents")
+            return count
+        except Exception as e:
+            logger.error(f"Failed to get document count: {e}")
+            return 0
+
 def get_vectorstore() -> Optional[VectorStore]:
     """Get vector store instance."""
     try:

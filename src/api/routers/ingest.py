@@ -4,6 +4,9 @@ import subprocess, sys
 from src.bootstrap.logger import get_logger
 from src.api.task_tracker import get_task_tracker
 from src.ingest.youtube import YouTubeVideoSource
+from src.worker.strategies.youtube import YouTubeIngestStrategy
+from src.rag.vector_store import get_vectorstore
+from src.kg.gremlin_client import GremlinKG
 import asyncio
 import time
 from typing import List, Optional, Dict, Any
@@ -52,7 +55,7 @@ async def run_ingest_worker(cmd: list[str], task_id: str):
         logger.error(f"Background task {task_id} execution failed: {e}")
 
 def process_videos_background(video_ids: List[str], task_id: str, process_segments: bool, segment_duration: float):
-    """Process all videos in background"""
+    """Process all videos in background using YouTube ingestion strategy"""
     tracker = get_task_tracker()
     try:
         asyncio.run(tracker.start_task(task_id))
@@ -60,12 +63,21 @@ def process_videos_background(video_ids: List[str], task_id: str, process_segmen
         logger.info(f"Background processing started for {len(video_ids)} videos")
         
         start_time = time.time()
-        video_source = YouTubeVideoSource()
         
-        for i, video_item in enumerate(video_source.fetch_video(video_ids), 1):
-            progress_msg = f"Processing video {i}/{len(video_ids)}: {video_item.id} - {video_item.title}"
+        # Initialize vector store and knowledge graph
+        vectordb = get_vectorstore()
+        kg = GremlinKG()
+        
+        # Use YouTube ingestion strategy to process videos
+        strategy = YouTubeIngestStrategy(vectordb=vectordb, kg=kg)
+        
+        for i, video_id in enumerate(video_ids, 1):
+            progress_msg = f"Processing video {i}/{len(video_ids)}: {video_id}"
             asyncio.run(tracker.update_progress(task_id, progress_msg))
-            logger.info(f"Background processed video {i}/{len(video_ids)}: {video_item.id}")
+            logger.info(f"Background processing video {i}/{len(video_ids)}: {video_id}")
+            
+            # Process single video
+            strategy.ingest([video_id])
         
         background_time = time.time() - start_time
         completion_msg = f"Background video processing completed in {background_time:.2f}s"
