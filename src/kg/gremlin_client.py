@@ -18,22 +18,31 @@ class GremlinClient:
         self.settings = get_settings()
         self.client = None
         self._initialize_client()
+    
     def _initialize_client(self):
         try:
             endpoint = self.settings.kg_uri or "ws://localhost:8182/gremlin"
+            logger.info(f"Attempting to connect to Gremlin at: {endpoint}")
             self.client = client.Client(endpoint, 'g')
             self._test_connection()
-            logger.info(f"Initialized Gremlin client: {endpoint}")
+            logger.info(f"Successfully initialized Gremlin client: {endpoint}")
         except Exception as e:
             logger.error(f"Failed to initialize Gremlin client: {e}")
-            self.client = None
+            raise Exception(f"Gremlin client not initialized: {e}")
+    
     def _test_connection(self):
         if self.client:
-            result = self.client.submit("g.V().limit(1)")
-            result.all().result()
+            try:
+                result = self.client.submit("g.V().limit(1)")
+                result.all().result()
+            except Exception as e:
+                logger.error(f"Gremlin connection test failed: {e}")
+                raise Exception(f"Gremlin connection test failed: {e}")
+    
     def _execute_query(self, query: str, parameters: Dict = None) -> List[Dict]:
         if not self.client:
             raise Exception("Gremlin client not initialized")
+        
         try:
             if parameters:
                 result = self.client.submit(query, parameters)
@@ -48,6 +57,7 @@ class GremlinKG(BaseKnowledgeGraph):
     def __init__(self):
         if client is None:
             raise ImportError("Install gremlinpython")
+        
         self.gremlin_client = GremlinClient()
         self.entity_extractor = SpaCyEntityExtractor()
         logger.info("GremlinKG initialized successfully")
@@ -71,6 +81,7 @@ class GremlinKG(BaseKnowledgeGraph):
                 "node_label": n.label, 
                 "node_type": n.label
             })
+        
         for e in edges:
             query = """
             g.V().has('node_id', source_id).as('s')
@@ -137,7 +148,7 @@ class GremlinKG(BaseKnowledgeGraph):
             return entities
         except Exception as e:
             logger.error(f"Error retrieving entities: {e}")
-            return []
+            raise
 
     def get_whole_graph(self) -> Dict[str, Any]:
         try:
@@ -151,6 +162,7 @@ class GremlinKG(BaseKnowledgeGraph):
                     "properties": {k: get_first(v) for k, v in item.items() if k not in ["node_id", "label"]}
                 }
                 nodes.append(node)
+            
             edges_query = "g.E().valueMap(true).toList()"
             edges_result = self.gremlin_client._execute_query(edges_query)
             edges = []
@@ -163,6 +175,7 @@ class GremlinKG(BaseKnowledgeGraph):
                     "properties": {k: get_first(v) for k, v in item.items() if k not in ["id", "label", "outV", "inV"]}
                 }
                 edges.append(edge)
+            
             return {
                 "nodes": nodes,
                 "edges": edges,
@@ -171,4 +184,4 @@ class GremlinKG(BaseKnowledgeGraph):
             }
         except Exception as e:
             logger.error(f"Error retrieving whole graph: {e}")
-            return {"nodes": [], "edges": [], "total_nodes": 0, "total_edges": 0}
+            raise

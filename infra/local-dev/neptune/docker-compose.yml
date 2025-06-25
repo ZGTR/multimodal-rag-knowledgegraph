@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  janusgraph:
+    image: janusgraph/janusgraph:latest
+    container_name: janusgraph-local
+    ports:
+      - "8182:8182"
+    environment:
+      - JANUS_PROPS_TEMPLATE=berkeleyje
+      - janusgraph.storage.backend=berkeleyje
+      - janusgraph.storage.directory=/var/lib/janusgraph/data
+      - janusgraph.index.search.backend=lucene
+      - janusgraph.index.search.directory=/var/lib/janusgraph/index
+    volumes:
+      - janusgraph_data:/var/lib/janusgraph/data
+      - janusgraph_index:/var/lib/janusgraph/index
+    networks:
+      - neptune-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8182/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  janusgraph_data:
+  janusgraph_index:
+
+networks:
+  neptune-network:
+    driver: bridge 
