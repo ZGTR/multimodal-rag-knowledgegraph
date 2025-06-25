@@ -21,10 +21,4 @@ class SpaCyEntityExtractor:
             return list(set(entities))
         except Exception as e:
             logger.warning(f"Failed to extract entities: {e}")
-            return []
-
-class FallbackEntityExtractor:
-    def extract_entities(self, text: str) -> List[str]:
-        import re
-        words = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', text)
-        return list(set(words[:10])) 
+            return [] 

@@ -1,4 +1,4 @@
-# API Expected Outputs Documentation
+# API Reference Documentation
 
 This document provides comprehensive examples of expected outputs for all API endpoints in the Multimodal RAG Knowledge Graph system.
 

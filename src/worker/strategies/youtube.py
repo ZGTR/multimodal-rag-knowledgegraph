@@ -50,18 +50,18 @@ class YouTubeIngestStrategy(BaseIngestStrategy):
         metadata = {
             "source": item.source,
             "id": item.id,
-            "title": getattr(item, 'title', ''),
-            "url": getattr(item, 'url', ''),
-            "timestamp": getattr(item, 'timestamp', datetime.now().isoformat())
+            "title": str(getattr(item, 'title', '')),
+            "url": str(getattr(item, 'url', '')),
+            "timestamp": str(getattr(item, 'timestamp', datetime.now().isoformat()))
         }
         self.vectordb.store_document(doc_id, item.text, metadata)
 
     def store_in_kg(self, doc_id: str, item: ContentItem):
         metadata = {
             "source": item.source,
-            "title": getattr(item, 'title', ''),
-            "url": getattr(item, 'url', ''),
-            "timestamp": getattr(item, 'timestamp', datetime.now().isoformat())
+            "title": str(getattr(item, 'title', '')),
+            "url": str(getattr(item, 'url', '')),
+            "timestamp": str(getattr(item, 'timestamp', datetime.now().isoformat()))
         }
         self.kg.store_content_with_entities(doc_id, item.text, metadata)
         logger.info(f"[YT] Stored in KG: {doc_id}") 
