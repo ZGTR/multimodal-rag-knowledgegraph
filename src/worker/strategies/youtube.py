@@ -1,7 +1,9 @@
-import re
+from .base import BaseIngestStrategy
 from src.ingest.youtube import YouTubeSource
+from src.ingest.base import ContentItem
+from datetime import datetime
+import re
 from src.bootstrap.logger import get_logger
-from .base import SourceStrategy
 
 logger = get_logger("youtube_strategy")
 
@@ -17,11 +19,49 @@ def extract_youtube_id(url: str) -> str:
             return match.group(1)
     return url
 
-class YouTubeStrategy(SourceStrategy):
-    """Strategy for fetching YouTube content."""
-    
-    def fetch(self, video_ids):
-        """Fetch YouTube content for the given video IDs or URLs."""
-        video_ids_clean = [extract_youtube_id(vid) for vid in video_ids]
-        logger.info(f"Extracted video IDs: {video_ids_clean}")
-        return YouTubeSource().fetch(video_ids_clean) 
+class YouTubeIngestStrategy(BaseIngestStrategy):
+    def ingest(self, items: list[str]):
+        video_ids = self.extract_video_ids(items)
+        logger.info(f"Extracted video IDs: {video_ids}")
+        yt_items = self.fetch_content(video_ids)
+        for item in yt_items:
+            self.process_item(item)
+
+    def extract_video_ids(self, items: list[str]) -> list[str]:
+        return [extract_youtube_id(vid) for vid in items]
+
+    def fetch_content(self, video_ids: list[str]) -> list[ContentItem]:
+        yt_source = YouTubeSource()
+        return yt_source.fetch(video_ids)
+
+    def process_item(self, item: ContentItem):
+        doc_id = f"youtube:{item.id}"
+        logger.info(f"[YT] Processing item: {doc_id}")
+        
+        if self.vectordb:
+            self.store_in_vector_store(doc_id, item)
+        
+        if self.kg:
+            self.store_in_kg(doc_id, item)
+        
+        logger.info(f"[YT] Finished item: {doc_id}")
+
+    def store_in_vector_store(self, doc_id: str, item: ContentItem):
+        metadata = {
+            "source": item.source,
+            "id": item.id,
+            "title": getattr(item, 'title', ''),
+            "url": getattr(item, 'url', ''),
+            "timestamp": getattr(item, 'timestamp', datetime.now().isoformat())
+        }
+        self.vectordb.store_document(doc_id, item.text, metadata)
+
+    def store_in_kg(self, doc_id: str, item: ContentItem):
+        metadata = {
+            "source": item.source,
+            "title": getattr(item, 'title', ''),
+            "url": getattr(item, 'url', ''),
+            "timestamp": getattr(item, 'timestamp', datetime.now().isoformat())
+        }
+        self.kg.store_content_with_entities(doc_id, item.text, metadata)
+        logger.info(f"[YT] Stored in KG: {doc_id}") 

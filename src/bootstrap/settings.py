@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     # Instagram API settings
     instagram_access_token: str | None = None
     
+    # AWS Neptune Configuration
+    NEPTUNE_CLUSTER_ENDPOINT: str | None = None
+    NEPTUNE_PORT: int = 8182
+    NEPTUNE_REGION: str = "us-east-1"
+    NEPTUNE_USE_SSL: bool = True
+    NEPTUNE_VERIFY_SSL: bool = True
+    
     model_config = SettingsConfigDict(env_file="local.env", case_sensitive=False)
 
 settings = Settings()

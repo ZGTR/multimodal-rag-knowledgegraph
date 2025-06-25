@@ -22,4 +22,6 @@ pytest-asyncio==1.0.0
 httpx==0.28.1
 
 # Additional dependencies that might be needed
-python-multipart>=0.0.5 
+python-multipart>=0.0.5
+gremlinpython
+spacy>=3.7.0 
