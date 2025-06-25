@@ -210,13 +210,16 @@ class GremlinClient:
             logger.error(f"Gremlin client connection test failed: {e}")
             raise
     
-    def _execute_query(self, query: str) -> List[Dict]:
+    def _execute_query(self, query: str, parameters: Dict = None) -> List[Dict]:
         """Execute a Gremlin query and return results"""
         if not self.client:
             raise Exception("Gremlin client not initialized")
         
         try:
-            result = self.client.submit(query)
+            if parameters:
+                result = self.client.submit(query, parameters)
+            else:
+                result = self.client.submit(query)
             return result.all().result()
         except Exception as e:
             logger.error(f"Query execution failed: {e}")
@@ -227,16 +230,15 @@ class GremlinKG:
         if client is None:
             raise ImportError("Install gremlinpython")
         
-        endpoint = endpoint or os.getenv("KG_URI")
-        
         try:
-            self.client = client.Client(
-                f"{endpoint}/gremlin", 'g', message_serializer=serializer.GraphSONSerializersV3d0())
+            # Use the new GremlinClient with Neptune support
+            self.gremlin_client = GremlinClient()
             self.in_memory = False
+            logger.info("GremlinKG initialized successfully")
         except Exception as e:
-            print(f"Failed to connect to Gremlin server: {e}")
-            print("Falling back to in-memory knowledge graph")
-            self.client = None
+            logger.error(f"Failed to connect to Gremlin server: {e}")
+            logger.info("Falling back to in-memory knowledge graph")
+            self.gremlin_client = None
             self.in_memory = True
             self.memory_kg = InMemoryKG()
 
@@ -260,16 +262,31 @@ class GremlinKG:
         if self.in_memory:
             self.memory_kg.upsert(nodes, edges)
         else:
-            for n in nodes:
-                self.client.submit(
-                    "g.V(id).fold().coalesce(unfold(), addV(label).property('id', id))",
-                    {"id": n.id, "label": n.label}
-                )
-            for e in edges:
-                self.client.submit(
-                    "g.V(source).as('s').V(target).coalesce(inE(label).where(outV().hasId(source)), addE(label).from('s'))",
-                    {"source": e.source, "target": e.target, "label": e.label}
-                )
+            try:
+                for n in nodes:
+                    query = """
+                    g.V().has('id', id).fold().coalesce(
+                        unfold(), 
+                        addV(label).property('id', id).property('type', type)
+                    )
+                    """
+                    self.gremlin_client._execute_query(query, {"id": n.id, "label": n.label, "type": n.label})
+                
+                for e in edges:
+                    query = """
+                    g.V().has('id', source).as('s')
+                    .V().has('id', target).as('t')
+                    .coalesce(
+                        inE(label).where(outV().hasId(source)),
+                        addE(label).from('s').to('t')
+                    )
+                    """
+                    self.gremlin_client._execute_query(query, {"source": e.source, "target": e.target, "label": e.label})
+                
+                logger.info(f"Upserted {len(nodes)} nodes and {len(edges)} edges")
+            except Exception as e:
+                logger.error(f"Failed to upsert to graph: {e}")
+                raise
 
     def get_all_entities(self) -> List[Dict[str, Any]]:
         """Retrieve all entities (nodes) from the knowledge graph."""
@@ -277,9 +294,10 @@ class GremlinKG:
             return self.memory_kg.get_all_entities()
         
         try:
-            result = self.client.submit("g.V().valueMap(true).toList()")
+            query = "g.V().valueMap(true).toList()"
+            result = self.gremlin_client._execute_query(query)
             entities = []
-            for item in result.all().result():
+            for item in result:
                 entity = {
                     "id": item.get("id", [None])[0] if item.get("id") else None,
                     "label": item.get("label", [None])[0] if item.get("label") else None,
@@ -288,7 +306,7 @@ class GremlinKG:
                 entities.append(entity)
             return entities
         except Exception as e:
-            print(f"Error retrieving entities: {e}")
+            logger.error(f"Error retrieving entities: {e}")
             return []
 
     def get_whole_graph(self) -> Dict[str, Any]:
@@ -298,9 +316,10 @@ class GremlinKG:
         
         try:
             # Get all nodes
-            nodes_result = self.client.submit("g.V().valueMap(true).toList()")
+            nodes_query = "g.V().valueMap(true).toList()"
+            nodes_result = self.gremlin_client._execute_query(nodes_query)
             nodes = []
-            for item in nodes_result.all().result():
+            for item in nodes_result:
                 node = {
                     "id": item.get("id", [None])[0] if item.get("id") else None,
                     "label": item.get("label", [None])[0] if item.get("label") else None,
@@ -309,9 +328,10 @@ class GremlinKG:
                 nodes.append(node)
             
             # Get all edges
-            edges_result = self.client.submit("g.E().valueMap(true).toList()")
+            edges_query = "g.E().valueMap(true).toList()"
+            edges_result = self.gremlin_client._execute_query(edges_query)
             edges = []
-            for item in edges_result.all().result():
+            for item in edges_result:
                 edge = {
                     "id": item.get("id", [None])[0] if item.get("id") else None,
                     "label": item.get("label", [None])[0] if item.get("label") else None,
@@ -328,5 +348,5 @@ class GremlinKG:
                 "total_edges": len(edges)
             }
         except Exception as e:
-            print(f"Error retrieving whole graph: {e}")
+            logger.error(f"Error retrieving whole graph: {e}")
             return {"nodes": [], "edges": [], "total_nodes": 0, "total_edges": 0}
