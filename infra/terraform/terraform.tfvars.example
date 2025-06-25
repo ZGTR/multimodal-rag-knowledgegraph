@@ -1,0 +1,37 @@
+# Copy this file to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to version control
+
+# General Configuration
+aws_region = "us-east-1"
+project_name = "multimodal-rag-kg"
+environment = "dev"  # dev, staging, prod
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"]
+private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+public_subnets = ["10.0.101.0/24", "10.0.102.0/24"]
+
+# Neptune Configuration
+neptune_cluster_name = "multimodal-rag-kg"
+neptune_instance_class = "db.r5.large"
+neptune_engine_version = "1.3.1.0"
+neptune_backup_retention = 7
+neptune_master_username = "admin"
+neptune_master_password = "YOUR_NEPTUNE_PASSWORD"  # Change this!
+
+# PostgreSQL Configuration
+postgresql_db_name = "vectordb"
+postgresql_username = "postgres"
+postgresql_password = "YOUR_POSTGRESQL_PASSWORD"  # Change this!
+postgresql_instance_class = "db.t3.micro"
+postgresql_allocated_storage = 20
+postgresql_engine_version = "14.10"
+
+# Application Configuration
+app_image = "multimodal-rag-kg:latest"
+app_port = 8000
+app_cpu = 256
+app_memory = 512
+embedding_model_name = "text-embedding-3-small"
+openai_api_key = "YOUR_OPENAI_API_KEY"  # Change this! 

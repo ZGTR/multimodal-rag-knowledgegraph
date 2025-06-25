@@ -6,6 +6,11 @@ from src.api.routers.search import router as search_router
 
 app = FastAPI()
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "message": "Multimodal RAG Knowledge Graph API is running"}
+
 app.include_router(ingest_router)
 app.include_router(entities_router)
 app.include_router(graph_router)

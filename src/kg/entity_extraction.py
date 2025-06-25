@@ -21,4 +21,17 @@ class SpaCyEntityExtractor:
             return list(set(entities))
         except Exception as e:
             logger.warning(f"Failed to extract entities: {e}")
-            return [] 
+            return []
+
+class FallbackEntityExtractor:
+    """Fallback entity extractor when spaCy is not available"""
+    
+    def __init__(self):
+        logger.info("Using fallback entity extractor")
+    
+    def extract_entities(self, text: str) -> List[str]:
+        """Simple fallback entity extraction using basic patterns"""
+        # This is a very basic fallback - in a real implementation you might use regex patterns
+        # or other simple heuristics to extract entities
+        logger.warning("Using basic fallback entity extraction")
+        return [] 
