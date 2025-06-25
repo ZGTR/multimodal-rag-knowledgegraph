@@ -1,3 +1,5 @@
+# DEPRECATED: See src/api/main.py and src/api/routers/* for all API endpoints.
+
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 import subprocess, sys
