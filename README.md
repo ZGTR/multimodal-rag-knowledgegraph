@@ -1,4 +1,4 @@
-# Multi-Source Knowledge Graph RAG Skeleton
+# Multi-Modal Knowledge Graph RAG Skeleton
 
 A FastAPI-based application for ingesting and processing content from multiple sources (YouTube, Twitter, Instagram) and building a knowledge graph with RAG capabilities.
 
