@@ -21,7 +21,7 @@ For everything deployment and local dev setup, please check [`DEPLOYMENT_GUIDE.m
 - **Entity Extraction**: Automatic identification of people, organizations, locations
 - **Comprehensive Logging**: Detailed progress tracking for all operations
 
-## 🎯 New: Temporal Video Search
+## Temporal Video Search
 
 The system now supports **temporal video search** - the ability to search for specific topics or entities within videos and receive precise timestamps indicating when they appear or are discussed.
 
@@ -75,7 +75,7 @@ curl -X GET "http://localhost:8000/temporal/video-timeline/dQw4w9WgXcQ"
 
 For complete API documentation, see [Temporal API Reference](docs/temporal-api-reference.md).
 
-## 📊 Enhanced Logging
+## Enhanced Logging
 
 The system now includes comprehensive logging for all operations, providing detailed visibility into:
 
@@ -224,19 +224,19 @@ The system uses **both** Knowledge Graph and Vector Database components working 
 │   ├── local-dev.sh           # Local development setup script
 │   ├── demo_temporal_search.py # Temporal search demo
 │   ├── test_temporal_api.py   # API testing script
-│   └── test_logging.py        # NEW: Logging test script
+│   └── test_logging.py        # Logging test script
 ├── src/                        # Application source code
 │   ├── api/                   # FastAPI application
 │   │   ├── main.py            # Main app configuration
 │   │   └── routers/           # API route handlers
-│   │       ├── temporal.py    # NEW: Temporal search endpoints
+│   │       ├── temporal.py    # Temporal search endpoints
 │   │       ├── search.py      # General search endpoints
 │   │       └── ...
 │   ├── ingest/                # Content ingestion
 │   │   ├── youtube.py         # Enhanced: Temporal video processing
-│   │   └── base.py           # NEW: Video-specific models
+│   │   └── base.py           # Video-specific models
 │   ├── rag/                   # RAG components
-│   │   ├── temporal_search.py # NEW: Temporal search service
+│   │   ├── temporal_search.py # Temporal search service
 │   │   └── vector_store.py   # Enhanced: Vector database operations
 │   ├── kg/                    # Knowledge graph
 │   │   ├── entity_extraction.py # Enhanced: Entity extraction with logging
@@ -245,8 +245,8 @@ The system uses **both** Knowledge Graph and Vector Database components working 
 │       └── strategies/
 │           └── youtube.py     # Enhanced: Temporal processing strategy
 ├── docs/                       # Documentation
-│   ├── temporal-video-search.md # NEW: Temporal search architecture
-│   └── temporal-api-reference.md # NEW: API reference
+│   ├── temporal-video-search.md # Temporal search architecture
+│   └── temporal-api-reference.md # API reference
 ├── tests/                      # Test files
 ├── DEPLOYMENT_GUIDE.md         # Comprehensive deployment guide
 └── README.md                   # This file
@@ -266,7 +266,7 @@ The system uses **both** Knowledge Graph and Vector Database components working 
 - AWS CLI configured
 
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Local Development and Deployments
 For detailed deployment instructions, see [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md).
@@ -286,12 +286,12 @@ curl -X POST "http://localhost:8000/ingest" \
 # Search for content (legacy)
 curl "http://localhost:8000/search?query=trump&k=5"
 
-# NEW: Temporal video search
+# Temporal video search
 curl -X POST "http://localhost:8000/temporal/ingest-video" \
   -H "Content-Type: application/json" \
   -d '{"video_ids": ["dQw4w9WgXcQ"]}'
 
-# NEW: Search for entity mentions with timestamps
+# Search for entity mentions with timestamps
 curl -X POST "http://localhost:8000/temporal/search-entity" \
   -H "Content-Type: application/json" \
   -d '{"entity": "Elon Musk", "max_results": 5}'
@@ -308,13 +308,13 @@ pytest tests/unit/
 pytest tests/integration/
 pytest tests/api/
 
-# NEW: Test temporal search API
+# Test temporal search API
 python scripts/test_temporal_api.py
 
-# NEW: Run temporal search demo
+# Run temporal search demo
 python scripts/demo_temporal_search.py
 
-# NEW: Test enhanced logging
+# Test enhanced logging
 python scripts/test_logging.py
 ```
 

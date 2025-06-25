@@ -2,7 +2,7 @@
 
 This guide explains how to deploy the Multimodal RAG Knowledge Graph application across different environments (local, dev, staging, prod) while maintaining security best practices.
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 The application uses a multi-database architecture:
 - **Neptune**: Graph database for knowledge graph storage and relationships
@@ -11,7 +11,7 @@ The application uses a multi-database architecture:
 - **ECS Fargate**: Containerized application deployment
 - **Application Load Balancer**: HTTPS termination and load balancing
 
-## 🔐 Security Model
+## Security Model
 
 ### Local Development
 - Uses Docker containers for databases
@@ -24,7 +24,7 @@ The application uses a multi-database architecture:
 - All databases encrypted at rest and in transit
 - Private subnets with NAT Gateway for internet access
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Local Development Setup
 
@@ -65,7 +65,7 @@ uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 ./infra/terraform/scripts/deploy.sh prod apply
 ```
 
-## 📋 Prerequisites
+## Prerequisites
 
 ### Required Tools
 - **Terraform** (>= 1.0)
@@ -81,7 +81,7 @@ Your AWS user/role needs permissions for:
 - Secrets Manager (for production)
 - Application Load Balancer
 
-## 🔧 Environment Configuration
+## Environment Configuration
 
 ### Environment-Specific Settings
 
@@ -106,7 +106,7 @@ infra/terraform/
     └── setup-secrets.sh # Secrets management
 ```
 
-## 🔒 Secrets Management
+## Secrets Management
 
 The project now uses AWS Secrets Manager for all sensitive configuration values, providing better security and consistency across environments.
 
@@ -162,7 +162,7 @@ All AWS environments use AWS Secrets Manager with the following structure:
 ./infra/terraform/scripts/setup-secrets.sh rotate dev
 ```
 
-## 🚀 Deployment Workflows
+## Deployment Workflows
 
 ### Development Workflow
 
@@ -220,7 +220,7 @@ All AWS environments use AWS Secrets Manager with the following structure:
    aws logs tail /ecs/multimodal-rag-kg-prod --follow
    ```
 
-## 🔍 Monitoring and Troubleshooting
+## Monitoring and Troubleshooting
 
 ### Health Checks
 
@@ -269,7 +269,7 @@ aws logs tail /ecs/multimodal-rag-kg-{environment} --follow
    terraform refresh
    ```
 
-## 💰 Cost Optimization
+## Cost Optimization
 
 ### Development
 - Use smallest instance types
@@ -288,7 +288,7 @@ aws logs tail /ecs/multimodal-rag-kg-{environment} --follow
 - **Staging**: ~$400-600/month
 - **Prod**: ~$800-1200/month
 
-## 🧹 Cleanup
+## Cleanup
 
 ### Destroy Infrastructure
 
@@ -321,7 +321,7 @@ docker rm gremlin-server
 ./infra/terraform/scripts/setup-secrets.sh delete prod
 ```
 
-## 🔄 CI/CD Integration
+## CI/CD Integration
 
 ### GitHub Actions Example
 
@@ -359,14 +359,14 @@ jobs:
           ./infra/terraform/scripts/deploy.sh prod apply
 ```
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [Terraform Documentation](https://www.terraform.io/docs)
 - [AWS Neptune Documentation](https://docs.aws.amazon.com/neptune/)
 - [AWS RDS Documentation](https://docs.aws.amazon.com/rds/)
 - [ECS Documentation](https://docs.aws.amazon.com/ecs/)
 
-## 🆘 Support
+## Support
 
 For issues or questions:
 1. Check the troubleshooting section
@@ -375,7 +375,7 @@ For issues or questions:
 4. Review Terraform documentation
 5. Check the project's GitHub issues
 
-## 🔐 Security Checklist
+## Security Checklist
 
 - [ ] Never commit secrets to version control
 - [ ] Use AWS Secrets Manager for production
