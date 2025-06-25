@@ -99,11 +99,12 @@ class InMemoryKG:
             entity_nodes.append(entity_node)
             
             # Create edge between content and entity
-            edge = {
-                "source": doc_id,
-                "target": entity_id,
-                "label": "contains_entity"
-            }
+            edge = Edge(
+                id=f"edge:{doc_id}:{entity_id}:contains_entity",
+                source=doc_id,
+                target=entity_id,
+                label="contains_entity"
+            )
             edges.append(edge)
         
         # Store all nodes and edges
@@ -243,9 +244,21 @@ class GremlinKG:
         """Extract named entities from text."""
         if self.in_memory:
             return self.memory_kg.extract_entities(text)
-        # For real Gremlin server, you might want to use a different approach
-        # or call an external NLP service
-        return []
+        
+        # For real Gremlin server, use spaCy for entity extraction
+        try:
+            import spacy
+            nlp = spacy.load("en_core_web_sm")
+            doc = nlp(text)
+            entities = [ent.text for ent in doc.ents if ent.label_ in ['PERSON', 'ORG', 'GPE', 'PRODUCT']]
+            return list(set(entities))  # Remove duplicates
+        except Exception as e:
+            logger.warning(f"Failed to extract entities with spaCy: {e}")
+            # Fallback: simple keyword extraction
+            import re
+            # Extract capitalized words that might be entities
+            words = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', text)
+            return list(set(words[:10]))  # Limit to 10 entities
     
     def store_content_with_entities(self, doc_id: str, content: str, metadata: Dict[str, Any]):
         """Store content and extract entities, creating nodes and edges automatically."""
@@ -253,7 +266,52 @@ class GremlinKG:
             self.memory_kg.store_content_with_entities(doc_id, content, metadata)
         else:
             # For real Gremlin server, implement similar logic
-            pass
+            try:
+                # Create content node
+                content_node = Node(
+                    id=doc_id,
+                    label="Content",
+                    properties={
+                        "type": "youtube_video",
+                        "content": content[:500],  # Truncate for storage
+                        **metadata
+                    }
+                )
+                
+                # Extract entities (simple approach for now)
+                entities = self.extract_entities(content)
+                entity_nodes = []
+                edges = []
+                
+                for entity in entities[:10]:  # Limit to 10 entities per document
+                    entity_id = f"entity:{entity.lower().replace(' ', '_')}"
+                    entity_node = Node(
+                        id=entity_id,
+                        label="Entity",
+                        properties={
+                            "name": entity,
+                            "type": "extracted"
+                        }
+                    )
+                    entity_nodes.append(entity_node)
+                    
+                    # Create edge between content and entity
+                    edge = Edge(
+                        id=f"edge:{doc_id}:{entity_id}:contains_entity",
+                        source=doc_id,
+                        target=entity_id,
+                        label="contains_entity"
+                    )
+                    edges.append(edge)
+                
+                # Store all nodes and edges
+                all_nodes = [content_node] + entity_nodes
+                self.upsert(all_nodes, edges)
+                logger.info(f"Stored content {doc_id} with {len(entities)} entities in Gremlin")
+                
+            except Exception as e:
+                logger.error(f"Failed to store content in Gremlin: {e}")
+                raise
 
     def upsert(self, nodes: List[Node], edges: List[Edge]):
         if self.in_memory:
@@ -262,23 +320,31 @@ class GremlinKG:
             try:
                 for n in nodes:
                     query = """
-                    g.V().has('id', id).fold().coalesce(
+                    g.V().has('node_id', node_id).fold().coalesce(
                         unfold(), 
-                        addV(label).property('id', id).property('type', type)
+                        addV(node_label).property('node_id', node_id).property('node_type', node_type)
                     )
                     """
-                    self.gremlin_client._execute_query(query, {"id": n.id, "label": n.label, "type": n.label})
+                    self.gremlin_client._execute_query(query, {
+                        "node_id": n.id, 
+                        "node_label": n.label, 
+                        "node_type": n.label
+                    })
                 
                 for e in edges:
                     query = """
-                    g.V().has('id', source).as('s')
-                    .V().has('id', target).as('t')
+                    g.V().has('node_id', source_id).as('s')
+                    .V().has('node_id', target_id).as('t')
                     .coalesce(
-                        inE(label).where(outV().hasId(source)),
-                        addE(label).from('s').to('t')
+                        inE(edge_label).where(outV().has('node_id', source_id)),
+                        addE(edge_label).from('s').to('t')
                     )
                     """
-                    self.gremlin_client._execute_query(query, {"source": e.source, "target": e.target, "label": e.label})
+                    self.gremlin_client._execute_query(query, {
+                        "source_id": e.source, 
+                        "target_id": e.target, 
+                        "edge_label": e.label
+                    })
                 
                 logger.info(f"Upserted {len(nodes)} nodes and {len(edges)} edges")
             except Exception as e:
@@ -290,15 +356,19 @@ class GremlinKG:
         if self.in_memory:
             return self.memory_kg.get_all_entities()
         
+        def get_first(val):
+            if isinstance(val, list):
+                return val[0] if val else None
+            return val
         try:
             query = "g.V().valueMap(true).toList()"
             result = self.gremlin_client._execute_query(query)
             entities = []
             for item in result:
                 entity = {
-                    "id": item.get("id", [None])[0] if item.get("id") else None,
-                    "label": item.get("label", [None])[0] if item.get("label") else None,
-                    "properties": {k: v[0] if v else None for k, v in item.items() if k not in ["id", "label"]}
+                    "id": get_first(item.get("node_id")),
+                    "label": get_first(item.get("label")),
+                    "properties": {k: get_first(v) for k, v in item.items() if k not in ["node_id", "label"]}
                 }
                 entities.append(entity)
             return entities
@@ -311,6 +381,10 @@ class GremlinKG:
         if self.in_memory:
             return self.memory_kg.get_whole_graph()
         
+        def get_first(val):
+            if isinstance(val, list):
+                return val[0] if val else None
+            return val
         try:
             # Get all nodes
             nodes_query = "g.V().valueMap(true).toList()"
@@ -318,9 +392,9 @@ class GremlinKG:
             nodes = []
             for item in nodes_result:
                 node = {
-                    "id": item.get("id", [None])[0] if item.get("id") else None,
-                    "label": item.get("label", [None])[0] if item.get("label") else None,
-                    "properties": {k: v[0] if v else None for k, v in item.items() if k not in ["id", "label"]}
+                    "id": get_first(item.get("node_id")),
+                    "label": get_first(item.get("label")),
+                    "properties": {k: get_first(v) for k, v in item.items() if k not in ["node_id", "label"]}
                 }
                 nodes.append(node)
             
@@ -330,11 +404,11 @@ class GremlinKG:
             edges = []
             for item in edges_result:
                 edge = {
-                    "id": item.get("id", [None])[0] if item.get("id") else None,
-                    "label": item.get("label", [None])[0] if item.get("label") else None,
-                    "outV": item.get("outV", [None])[0] if item.get("outV") else None,
-                    "inV": item.get("inV", [None])[0] if item.get("inV") else None,
-                    "properties": {k: v[0] if v else None for k, v in item.items() if k not in ["id", "label", "outV", "inV"]}
+                    "id": get_first(item.get("id")),
+                    "label": get_first(item.get("label")),
+                    "outV": get_first(item.get("outV")),
+                    "inV": get_first(item.get("inV")),
+                    "properties": {k: get_first(v) for k, v in item.items() if k not in ["id", "label", "outV", "inV"]}
                 }
                 edges.append(edge)
             
