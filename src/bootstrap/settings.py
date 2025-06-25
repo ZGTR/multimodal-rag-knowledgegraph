@@ -6,7 +6,7 @@ from src.bootstrap.logger import get_logger
 logger = get_logger("settings")
 
 class Settings(BaseSettings):
-    app_env: Literal["dev", "prod"] = "dev"
+    app_env: Literal["local", "dev", "prod"] = "dev"
     log_level: Literal["debug", "info", "warning", "error"] = "info"
     aws_region: str = "eu-west-2"
     vectordb_uri: str | None = None
@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     NEPTUNE_USE_SSL: bool = True
     NEPTUNE_VERIFY_SSL: bool = True
     
-    model_config = SettingsConfigDict(env_file="local.env", case_sensitive=False)
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 settings = Settings()
 logger.info(f"Settings loaded: app_env={settings.app_env}, vectordb_uri={settings.vectordb_uri}, kg_uri={settings.kg_uri}")
