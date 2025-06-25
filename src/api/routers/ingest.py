@@ -6,7 +6,7 @@ from src.api.task_tracker import get_task_tracker
 from src.ingest.youtube import YouTubeVideoSource
 import asyncio
 import time
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 router = APIRouter()
 logger = get_logger("api.ingest")
@@ -15,25 +15,18 @@ class IngestRequest(BaseModel):
     videos: list[str] | None = None
     twitter: list[str] | None = None
     ig: list[str] | None = None
-
-class IngestResponse(BaseModel):
-    status: str
-    task_id: str
-    cmd: list[str]
-    message: str
-
-class VideoIngestRequest(BaseModel):
-    video_ids: List[str]
     process_segments: bool = True
     segment_duration: Optional[float] = 30.0
 
-class VideoIngestResponse(BaseModel):
+class IngestResponse(BaseModel):
     status: str
     message: str
-    video_id: str
-    segments_processed: int
-    entities_found: List[str]
-    duration: float
+    task_id: Optional[str] = None
+    cmd: Optional[list[str]] = None
+    video_id: Optional[str] = None
+    segments_processed: Optional[int] = None
+    entities_found: Optional[List[str]] = None
+    duration: Optional[float] = None
 
 async def run_ingest_worker(cmd: list[str], task_id: str):
     """Run the ingest worker and track its progress"""
@@ -58,9 +51,61 @@ async def run_ingest_worker(cmd: list[str], task_id: str):
         await tracker.complete_task(task_id, success=False, error_message=error_msg)
         logger.error(f"Background task {task_id} execution failed: {e}")
 
-@router.post("/ingest", response_model=IngestResponse)
-async def ingest(req: IngestRequest, bg: BackgroundTasks):
-    logger.info(f"Received ingest request: {req}")
+def process_videos_background(video_ids: List[str], task_id: str, process_segments: bool, segment_duration: float):
+    """Process all videos in background"""
+    tracker = get_task_tracker()
+    try:
+        asyncio.run(tracker.start_task(task_id))
+        asyncio.run(tracker.update_progress(task_id, f"Starting background processing for {len(video_ids)} videos"))
+        logger.info(f"Background processing started for {len(video_ids)} videos")
+        
+        start_time = time.time()
+        video_source = YouTubeVideoSource()
+        
+        for i, video_item in enumerate(video_source.fetch_video(video_ids), 1):
+            progress_msg = f"Processing video {i}/{len(video_ids)}: {video_item.id} - {video_item.title}"
+            asyncio.run(tracker.update_progress(task_id, progress_msg))
+            logger.info(f"Background processed video {i}/{len(video_ids)}: {video_item.id}")
+        
+        background_time = time.time() - start_time
+        completion_msg = f"Background video processing completed in {background_time:.2f}s"
+        asyncio.run(tracker.update_progress(task_id, completion_msg))
+        asyncio.run(tracker.complete_task(task_id, success=True))
+        logger.info(f"Background video processing completed in {background_time:.2f}s")
+        
+    except Exception as e:
+        error_msg = f"Background video processing failed: {e}"
+        asyncio.run(tracker.update_progress(task_id, error_msg))
+        asyncio.run(tracker.complete_task(task_id, success=False, error_message=error_msg))
+        logger.error(f"Background video processing failed: {e}")
+
+async def process_video_ingestion(videos: List[str], process_segments: bool, segment_duration: float, bg: BackgroundTasks) -> IngestResponse:
+    """Handle video ingestion with background processing for all videos"""
+    logger.info(f"Queuing {len(videos)} videos for background processing")
+    
+    metadata = {
+        "video_ids": videos,
+        "process_segments": process_segments,
+        "segment_duration": segment_duration,
+        "request_type": "temporal_video_ingest"
+    }
+    
+    tracker = get_task_tracker()
+    cmd = ["background_video_processing", "--videos"] + videos
+    task_id = await tracker.add_task(cmd, metadata=metadata)
+    
+    bg.add_task(process_videos_background, videos, task_id, process_segments, segment_duration)
+    logger.info(f"Background task {task_id} queued for {len(videos)} videos")
+    
+    return IngestResponse(
+        status="queued",
+        message=f"Background task queued for {len(videos)} videos with ID: {task_id}",
+        task_id=task_id,
+        cmd=cmd
+    )
+
+async def process_generic_ingestion(req: IngestRequest, bg: BackgroundTasks) -> IngestResponse:
+    """Handle generic ingestion (Twitter, IG, etc.)"""
     cmd = [sys.executable, "-m", "src.worker.ingest_worker"]
     if req.videos:
         cmd += ["--videos"] + req.videos
@@ -68,96 +113,34 @@ async def ingest(req: IngestRequest, bg: BackgroundTasks):
         cmd += ["--twitter"] + req.twitter
     if req.ig:
         cmd += ["--ig"] + req.ig
+    
     metadata = {
         "videos": req.videos,
         "twitter": req.twitter,
         "ig": req.ig,
         "request_type": "ingest"
     }
+    
     tracker = get_task_tracker()
     task_id = await tracker.add_task(cmd, metadata=metadata)
     logger.info(f"Queuing background task {task_id}: {cmd}")
     bg.add_task(run_ingest_worker, cmd, task_id)
+    
     return IngestResponse(
         status="queued",
+        message=f"Background task queued with ID: {task_id}",
         task_id=task_id,
-        cmd=cmd,
-        message=f"Background task queued with ID: {task_id}"
+        cmd=cmd
     )
 
-@router.post("/ingest/video", response_model=VideoIngestResponse)
-async def ingest_video(request: VideoIngestRequest, background_tasks: BackgroundTasks):
-    """
-    Ingest a YouTube video with temporal processing (segments, entities, etc.)
-    """
-    start_time = time.time()
-    logger.info(f"Video ingest request received: {len(request.video_ids)} videos")
-    logger.info(f"Request parameters: process_segments={request.process_segments}, segment_duration={request.segment_duration}")
-    try:
-        video_source = YouTubeVideoSource()
-        video_item = None
-        logger.info(f"Processing first video: {request.video_ids[0]}")
-        for item in video_source.fetch_video([request.video_ids[0]]):
-            video_item = item
-            break
-        if not video_item:
-            logger.error(f"Video not found or could not be processed: {request.video_ids[0]}")
-            raise HTTPException(status_code=404, detail="Video not found or could not be processed")
-        all_entities = []
-        for segment in video_item.segments:
-            all_entities.extend(segment.entities)
-        all_entities = list(set(all_entities))
-        logger.info(f"Video processed successfully: {video_item.title}")
-        logger.info(f"Found {len(video_item.segments)} segments and {len(all_entities)} unique entities")
-        if len(request.video_ids) > 1:
-            logger.info(f"Adding background task for {len(request.video_ids) - 1} remaining videos")
-            metadata = {
-                "video_ids": request.video_ids[1:],
-                "process_segments": request.process_segments,
-                "segment_duration": request.segment_duration,
-                "request_type": "temporal_video_ingest"
-            }
-            tracker = get_task_tracker()
-            cmd = ["background_video_processing", "--videos"] + request.video_ids[1:]
-            task_id = await tracker.add_task(cmd, metadata=metadata)
-            background_tasks.add_task(process_remaining_videos, request.video_ids[1:], task_id)
-            logger.info(f"Background task {task_id} queued for remaining videos")
-        processing_time = time.time() - start_time
-        logger.info(f"Video ingestion completed in {processing_time:.2f}s")
-        return VideoIngestResponse(
-            status="success",
-            message=f"Video '{video_item.title}' processed successfully",
-            video_id=video_item.id,
-            segments_processed=len(video_item.segments),
-            entities_found=all_entities,
-            duration=video_item.duration
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Video ingestion failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Video ingestion failed: {str(e)}")
-
-def process_remaining_videos(video_ids: List[str], task_id: str):
-    """Process remaining videos in the background with task tracking"""
-    tracker = get_task_tracker()
-    try:
-        asyncio.run(tracker.start_task(task_id))
-        asyncio.run(tracker.update_progress(task_id, f"Starting background processing for {len(video_ids)} videos"))
-        logger.info(f"Background processing started for {len(video_ids)} videos")
-        start_time = time.time()
-        video_source = YouTubeVideoSource()
-        for i, video_item in enumerate(video_source.fetch_video(video_ids), 1):
-            progress_msg = f"Processing video {i}/{len(video_ids)}: {video_item.id}"
-            asyncio.run(tracker.update_progress(task_id, progress_msg))
-            logger.info(f"Background processed video {i}/{len(video_ids)}: {video_item.id}")
-        background_time = time.time() - start_time
-        completion_msg = f"Background video processing completed in {background_time:.2f}s"
-        asyncio.run(tracker.update_progress(task_id, completion_msg))
-        asyncio.run(tracker.complete_task(task_id, success=True))
-        logger.info(f"Background video processing completed in {background_time:.2f}s")
-    except Exception as e:
-        error_msg = f"Background video processing failed: {e}"
-        asyncio.run(tracker.update_progress(task_id, error_msg))
-        asyncio.run(tracker.complete_task(task_id, success=False, error_message=error_msg))
-        logger.error(f"Background video processing failed: {e}") 
+@router.post("/ingest", response_model=IngestResponse)
+async def ingest(req: IngestRequest, bg: BackgroundTasks):
+    """Unified ingestion endpoint for videos, Twitter, and Instagram"""
+    logger.info(f"Received ingest request: {req}")
+    
+    # If videos are provided, do temporal video processing in background
+    if req.videos:
+        return await process_video_ingestion(req.videos, req.process_segments, req.segment_duration, bg)
+    
+    # Otherwise, handle Twitter/IG ingestion
+    return await process_generic_ingestion(req, bg) 
