@@ -6,6 +6,8 @@ This is not aimed to be prod-ready (though it can be). Albeit, we have to move t
 
 I may evolve this overtime. If you like to ask questions, please don't hesitate to send me an email: mohammadshakergtr@gmail.com
 
+For everything deployment and local dev setup, please check [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md).
+
 ## Features
 
 - **Multimodal Ingestion**: YouTube videos, Twitter posts, Instagram content
@@ -117,31 +119,7 @@ The system uses **both** Knowledge Graph and Vector Database components working 
 
 ## 🚀 Quick Start
 
-### Local Development
-
-```bash
-# Clone and setup
-git clone <repository-url>
-cd multimodal-rag-knowledgegraph
-
-# Setup local environment (Docker services)
-./infra/terraform/scripts/deploy.sh local setup
-
-# Install Python dependencies
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Configure environment variables
-# Option 1: Fetch from AWS Secrets Manager (if you have AWS access)
-./scripts/local-dev.sh dev
-
-# Option 2: Create .env file manually
-./scripts/local-dev.sh
-
-# Start the application
-uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
-```
+### Local Development and Deployments
 For detailed deployment instructions, see [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md).
 
 
