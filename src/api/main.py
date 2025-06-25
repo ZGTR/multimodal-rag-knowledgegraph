@@ -5,6 +5,7 @@ from src.api.routers.graph import router as graph_router
 from src.api.routers.search import router as search_router
 from src.api.routers.temporal import router as temporal_router
 from src.api.routers.tasks import router as tasks_router
+from src.api.routers.llm import router as llm_router
 
 app = FastAPI(
     title="Multimodal RAG Knowledge Graph API",
@@ -22,4 +23,5 @@ app.include_router(entities_router)
 app.include_router(graph_router)
 app.include_router(search_router)
 app.include_router(temporal_router)
-app.include_router(tasks_router) 
+app.include_router(tasks_router)
+app.include_router(llm_router) 

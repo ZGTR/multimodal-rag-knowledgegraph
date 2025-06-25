@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     aws_region: str = "eu-west-2"
     vectordb_uri: str | None = None
     embedding_model_name: str = "text-embedding-3-small"
+    llm_model_name: str = "gpt-3.5-turbo"
     kg_backend: Literal["neptune", "neo4j", "dgraph"] = "neptune"
     kg_uri: str | None = None
     transcripts_bucket: str = "kg-rag-transcripts"
@@ -38,7 +39,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
 settings = Settings()
-logger.info(f"Settings loaded: app_env={settings.app_env}, vectordb_uri={settings.vectordb_uri}, kg_uri={settings.kg_uri}")
+logger.info(f"Settings loaded: app_env={settings.app_env}, vectordb_uri={settings.vectordb_uri}, kg_uri={settings.kg_uri}, llm_model_name={settings.llm_model_name}")
 
 def get_settings() -> Settings:
     """Get the settings instance."""
