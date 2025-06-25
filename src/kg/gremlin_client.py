@@ -185,3 +185,36 @@ class GremlinKG(BaseKnowledgeGraph):
         except Exception as e:
             logger.error(f"Error retrieving whole graph: {e}")
             raise
+
+    def get_facts_for_entity(self, entity_name: str) -> list[str]:
+        """Return a list of fact strings about the entity from the KG."""
+        facts = []
+        try:
+            # Find the entity node by name
+            entity_id = f"entity:{entity_name.lower().replace(' ', '_')}"
+            query = "g.V().has('node_id', entity_id).valueMap(true).toList()"
+            result = self.gremlin_client._execute_query(query, {"entity_id": entity_id})
+            if result:
+                entity = result[0]
+                label = entity.get("label", ["Entity"])[0]
+                name = entity.get("name", [entity_name])[0]
+                # Add properties as facts
+                for k, v in entity.items():
+                    if k not in ["node_id", "label", "name"]:
+                        facts.append(f"{name} ({label}) has {k}: {v[0] if isinstance(v, list) else v}")
+                facts.append(f"{name} is a {label} node in the knowledge graph.")
+            # Find outgoing edges (relationships)
+            edge_query = """
+            g.V().has('node_id', entity_id).bothE().as('e').otherV().as('v').select('e','v').toList()
+            """
+            edge_results = self.gremlin_client._execute_query(edge_query, {"entity_id": entity_id})
+            for edge in edge_results:
+                e = edge.get("e", {})
+                v = edge.get("v", {})
+                edge_label = e.get("label", ["related"])[0] if isinstance(e.get("label"), list) else e.get("label", "related")
+                target_label = v.get("label", ["Node"])[0] if isinstance(v.get("label"), list) else v.get("label", "Node")
+                target_name = v.get("name", [v.get("node_id", ["unknown"])[0]])[0] if isinstance(v.get("name"), list) else v.get("name", v.get("node_id", "unknown"))
+                facts.append(f"{entity_name} {edge_label} {target_label}: {target_name}")
+        except Exception as e:
+            logger.warning(f"Could not get facts for entity '{entity_name}': {e}")
+        return facts

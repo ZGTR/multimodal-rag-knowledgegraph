@@ -19,6 +19,8 @@ class LLMQueryRequest(BaseModel):
 class LLMQueryResponse(BaseModel):
     answer: str
     relevant_splits: List[Dict[str, Any]]
+    entities: List[str] = []
+    kg_facts: Dict[str, List[str]] = {}
 
 @router.post("/query", response_model=LLMQueryResponse)
 async def llm_query(request: LLMQueryRequest):
@@ -40,28 +42,65 @@ async def llm_query(request: LLMQueryRequest):
         logger.warning("No relevant splits found in vector store")
         return LLMQueryResponse(answer="No relevant video splits found.", relevant_splits=[])
 
-    # 2. Optionally, filter/augment with KG (e.g., entity match)
+    # 2. Use KG to extract entities and get facts
     kg = None
+    entities = []
+    kg_facts = {}
     try:
         kg = GremlinKG()
+        # Extract entities from the question
+        entities = kg.extract_entities(question)
+        # If no entities, extract from splits' metadata
+        if not entities:
+            split_entities = []
+            for doc in docs:
+                ents = doc.metadata.get('entities', [])
+                split_entities.extend(ents)
+            # Deduplicate
+            entities = list(set(split_entities))
+        else:
+            # Also add entities from splits for completeness
+            split_entities = []
+            for doc in docs:
+                ents = doc.metadata.get('entities', [])
+                split_entities.extend(ents)
+            entities = list(set(entities + split_entities))
+        # Get KG facts for all entities
+        for entity in entities:
+            facts = kg.get_facts_for_entity(entity)
+            if facts:
+                kg_facts[entity] = facts
     except Exception as e:
-        logger.warning(f"KG not available: {e}")
+        logger.warning(f"KG not available or failed: {e}")
 
-    # 3. Prepare context for LLM
-    context = "\n\n".join([f"Split {i+1}: {doc.page_content}" for i, doc in enumerate(docs)])
+    # 3. Prepare KG facts context
+    if kg_facts:
+        facts_text = "\n".join([f"- {fact}" for entity, facts in kg_facts.items() for fact in facts])
+        kg_context = f"Here are facts from the knowledge graph about the entities in your question:\n{facts_text}\n"
+    else:
+        kg_context = ""
+
+    # 4. Prepare video splits context
+    splits_context = "Here are the most relevant video splits:\n" + \
+        "\n\n".join([f"Split {i+1}: {doc.page_content}" for i, doc in enumerate(docs)])
+
+    # 5. Combine for LLM context
+    full_context = kg_context + splits_context
+
+    # 6. Prompt the LLM
     system_prompt = (
         "You are an expert assistant for video analysis. "
-        "Given a user question and a set of video splits (segments), "
-        "answer the question as precisely as possible, referencing the relevant splits. "
+        "Given a user question, a set of knowledge graph facts, and a set of video splits, "
+        "answer the question as precisely as possible, referencing both the facts and the splits. "
         "If the question asks for a list, return a list of relevant split numbers and their content. "
         "If no relevant information is found, say so."
     )
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_prompt),
-        ("human", f"Question: {question}\n\nVideo Splits:\n{context}")
+        ("human", f"Question: {question}\n\n{full_context}")
     ])
 
-    # 4. Call OpenAI LLM via LangChain
+    # 7. Call OpenAI LLM via LangChain
     try:
         llm = ChatOpenAI(
             model=settings.llm_model_name,
@@ -75,9 +114,14 @@ async def llm_query(request: LLMQueryRequest):
         logger.error(f"LLM call failed: {e}")
         raise HTTPException(status_code=500, detail=f"LLM call failed: {e}")
 
-    # 5. Return answer and relevant splits
+    # 8. Return answer, relevant splits, entities, and KG facts
     relevant_splits = [
         {"split_number": i+1, "content": doc.page_content, "metadata": doc.metadata}
         for i, doc in enumerate(docs)
     ]
-    return LLMQueryResponse(answer=answer, relevant_splits=relevant_splits) 
+    return LLMQueryResponse(
+        answer=answer,
+        relevant_splits=relevant_splits,
+        entities=entities,
+        kg_facts=kg_facts
+    ) 
