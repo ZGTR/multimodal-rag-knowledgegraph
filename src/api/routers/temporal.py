@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple
 from src.rag.temporal_search import get_temporal_search_service, TemporalSearchQuery, TemporalSearchResult
 from src.ingest.youtube import YouTubeVideoSource
 from src.bootstrap.logger import get_logger
+from src.api.task_tracker import get_task_tracker
 import json
 import time
 
@@ -104,7 +105,24 @@ async def ingest_video(request: VideoIngestRequest, background_tasks: Background
         # Add background task for processing remaining videos
         if len(request.video_ids) > 1:
             logger.info(f"Adding background task for {len(request.video_ids) - 1} remaining videos")
-            background_tasks.add_task(process_remaining_videos, request.video_ids[1:])
+            
+            # Create metadata for tracking
+            metadata = {
+                "video_ids": request.video_ids[1:],
+                "process_segments": request.process_segments,
+                "segment_duration": request.segment_duration,
+                "request_type": "temporal_video_ingest"
+            }
+            
+            # Add task to tracker
+            tracker = get_task_tracker()
+            cmd = ["background_video_processing", "--videos"] + request.video_ids[1:]
+            task_id = await tracker.add_task(cmd, metadata=metadata)
+            
+            # Add to FastAPI background tasks
+            background_tasks.add_task(process_remaining_videos, request.video_ids[1:], task_id)
+            
+            logger.info(f"Background task {task_id} queued for remaining videos")
         
         processing_time = time.time() - start_time
         logger.info(f"Video ingestion completed in {processing_time:.2f}s")
@@ -403,18 +421,32 @@ async def get_temporal_search_stats():
         raise HTTPException(status_code=500, detail=f"Stats retrieval failed: {str(e)}")
 
 # Helper function for background processing
-async def process_remaining_videos(video_ids: List[str]):
-    """Process remaining videos in the background"""
-    logger.info(f"Background processing started for {len(video_ids)} videos")
-    start_time = time.time()
+async def process_remaining_videos(video_ids: List[str], task_id: str):
+    """Process remaining videos in the background with task tracking"""
+    tracker = get_task_tracker()
     
     try:
+        # Mark task as started
+        await tracker.start_task(task_id)
+        await tracker.update_progress(task_id, f"Starting background processing for {len(video_ids)} videos")
+        
+        logger.info(f"Background processing started for {len(video_ids)} videos")
+        start_time = time.time()
+        
         video_source = YouTubeVideoSource()
         for i, video_item in enumerate(video_source.fetch_video(video_ids), 1):
+            progress_msg = f"Processing video {i}/{len(video_ids)}: {video_item.id}"
+            await tracker.update_progress(task_id, progress_msg)
             logger.info(f"Background processed video {i}/{len(video_ids)}: {video_item.id}")
         
         background_time = time.time() - start_time
+        completion_msg = f"Background video processing completed in {background_time:.2f}s"
+        await tracker.update_progress(task_id, completion_msg)
+        await tracker.complete_task(task_id, success=True)
         logger.info(f"Background video processing completed in {background_time:.2f}s")
         
     except Exception as e:
+        error_msg = f"Background video processing failed: {e}"
+        await tracker.update_progress(task_id, error_msg)
+        await tracker.complete_task(task_id, success=False, error_message=error_msg)
         logger.error(f"Background video processing failed: {e}") 

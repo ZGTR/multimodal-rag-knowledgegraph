@@ -14,15 +14,11 @@ yt-dlp==2025.6.9
 langchain==0.3.26
 langchain-community==0.3.26
 langchain-openai==0.3.25
-langchain-chat-openai==0.1.12
 openai==1.91.0
 psycopg2-binary==2.9.10
 
 # Analytics dependencies
-pandas==2.2.3
-sqlalchemy==2.0.34
-umap-learn==0.6.3
-matplotlib==3.9.1
+# Removed: pandas==2.2.3, sqlalchemy==2.0.34, umap-learn==0.5.7, matplotlib==3.9.1
 
 # Testing dependencies
 pytest==8.4.1
