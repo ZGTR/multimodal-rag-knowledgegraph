@@ -161,7 +161,7 @@ class GremlinClient:
         """Initialize Gremlin client with Neptune-specific configuration"""
         try:
             # Use Neptune endpoint if configured, otherwise fallback to local
-            if self.settings.NEPTUNE_CLUSTER_ENDPOINT:
+            if self.settings.NEPTUNE_CLUSTER_ENDPOINT and not self.settings.NEPTUNE_CLUSTER_ENDPOINT.startswith('test-'):
                 endpoint = self.settings.NEPTUNE_CLUSTER_ENDPOINT
                 port = self.settings.NEPTUNE_PORT
                 use_ssl = self.settings.NEPTUNE_USE_SSL
@@ -229,18 +229,15 @@ class GremlinKG:
     def __init__(self, endpoint: str | None = None):
         if client is None:
             raise ImportError("Install gremlinpython")
-        
         try:
-            # Use the new GremlinClient with Neptune support
             self.gremlin_client = GremlinClient()
+            if self.gremlin_client.client is None:
+                raise Exception("GremlinClient failed to initialize (no connection to Neptune)")
             self.in_memory = False
             logger.info("GremlinKG initialized successfully")
         except Exception as e:
             logger.error(f"Failed to connect to Gremlin server: {e}")
-            logger.info("Falling back to in-memory knowledge graph")
-            self.gremlin_client = None
-            self.in_memory = True
-            self.memory_kg = InMemoryKG()
+            raise  # Do not fallback to in-memory KG
 
     def extract_entities(self, text: str) -> List[str]:
         """Extract named entities from text."""

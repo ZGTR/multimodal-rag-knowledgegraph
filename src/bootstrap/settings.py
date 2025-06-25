@@ -35,3 +35,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 logger.info(f"Settings loaded: app_env={settings.app_env}, vectordb_uri={settings.vectordb_uri}, kg_uri={settings.kg_uri}")
+
+def get_settings() -> Settings:
+    """Get the settings instance."""
+    return settings
