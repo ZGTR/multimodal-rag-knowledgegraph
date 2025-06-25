@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from src.api.handler import IngestRequest
+from src.api.routers.ingest import IngestRequest
 
 class TestIngestRequest:
     """Test cases for the IngestRequest model"""

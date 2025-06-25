@@ -29,29 +29,37 @@ The application uses a multi-database architecture:
 ### 1. Local Development Setup
 
 ```bash
+# Clone and setup
+git clone <repository-url>
+cd multimodal-rag-knowledgegraph
+
 # Setup local environment (Docker services)
 ./infra/terraform/scripts/deploy.sh local setup
 
-# This starts:
-# - PostgreSQL with pgvector on port 5432
-# - Gremlin Server on port 8182
-
-# Run the application locally
+# Install Python dependencies
 python -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
+
+# Configure environment variables
+# Option 1: Fetch from AWS Secrets Manager (if you have AWS access)
+./scripts/local-dev.sh dev
+
+# Option 2: Create .env file manually
+./scripts/local-dev.sh
+
+# Start the application
 uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 2. AWS Environment Deployment
 
 ```bash
-# Deploy to development environment
-./infra/terraform/scripts/deploy.sh dev plan
-./infra/terraform/scripts/deploy.sh dev apply
+# Setup secrets for your environment
+./infra/terraform/scripts/setup-secrets.sh setup dev
 
-# Deploy to staging environment
-./infra/terraform/scripts/deploy.sh staging apply
+# Deploy to development environment
+./infra/terraform/scripts/deploy.sh dev apply
 
 # Deploy to production environment
 ./infra/terraform/scripts/deploy.sh prod apply
@@ -100,51 +108,58 @@ infra/terraform/
 
 ## 🔒 Secrets Management
 
+The project now uses AWS Secrets Manager for all sensitive configuration values, providing better security and consistency across environments.
+
 ### Local Development
-Create a `.env` file based on the template:
+
+For local development, you have two options:
+
+#### Option 1: Use AWS Secrets Manager (Recommended)
+
+If you have AWS access and secrets are already configured:
 
 ```bash
-cp config/env/example.env .env
+# Fetch secrets from AWS Secrets Manager for dev environment
+./scripts/local-dev.sh dev
 ```
 
-Update with your local configuration:
-```env
-# Knowledge Graph (Gremlin Server)
-KG_URI=ws://localhost:8182/gremlin
+#### Option 2: Manual Configuration
 
-# Vector Database (PostgreSQL with pgvector)
-VECTORDB_URI=postgresql://postgres:postgres@localhost:5432/vectordb
+If you don't have AWS access or want to use local values:
 
-# Embedding Model
-EMBEDDING_MODEL_NAME=text-embedding-3-small
-
-# OpenAI API (optional)
-OPENAI_API_KEY=your-openai-api-key
+```bash
+# Create .env file with manual input
+./scripts/local-dev.sh
 ```
+
+This will prompt you for:
+- Neptune password
+- PostgreSQL password  
+- OpenAI API key (optional)
 
 ### AWS Environments
 
-#### Development/Staging
-Secrets are prompted during deployment:
-```bash
-./infra/terraform/scripts/deploy.sh dev apply
-# You'll be prompted for:
-# - Neptune master password
-# - PostgreSQL password
-# - OpenAI API key (optional)
+All AWS environments use AWS Secrets Manager with the following structure:
+```
+/multimodal-rag-kg/{environment}/{secret-name}
 ```
 
-#### Production
-Use AWS Secrets Manager:
+#### Required Secrets
+- `/multimodal-rag-kg/{environment}/neptune-password`
+- `/multimodal-rag-kg/{environment}/postgresql-password`
+- `/multimodal-rag-kg/{environment}/openai-api-key`
+
+#### Setting Up Secrets
 
 ```bash
-# Setup production secrets
-./infra/terraform/scripts/setup-secrets.sh setup prod
+# Setup secrets for an environment
+./infra/terraform/scripts/setup-secrets.sh setup dev
 
-# This creates:
-# - /multimodal-rag-kg/prod/neptune-password
-# - /multimodal-rag-kg/prod/postgresql-password
-# - /multimodal-rag-kg/prod/openai-api-key
+# List secrets for an environment
+./infra/terraform/scripts/setup-secrets.sh list dev
+
+# Rotate secrets for an environment
+./infra/terraform/scripts/setup-secrets.sh rotate dev
 ```
 
 ## 🚀 Deployment Workflows

@@ -98,42 +98,6 @@ setup_local() {
     echo "  uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000"
 }
 
-# Function to get sensitive variables
-get_sensitive_variables() {
-    local env=$1
-    
-    print_status "Getting sensitive variables for environment: $env"
-    
-    # For production, use AWS Secrets Manager
-    if [ "$env" = "prod" ]; then
-        print_status "Using AWS Secrets Manager for production secrets..."
-        
-        # Get secrets from AWS Secrets Manager
-        NEPTUNE_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "/multimodal-rag-kg/prod/neptune-password" --query 'SecretString' --output text 2>/dev/null || echo "")
-        POSTGRESQL_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "/multimodal-rag-kg/prod/postgresql-password" --query 'SecretString' --output text 2>/dev/null || echo "")
-        OPENAI_API_KEY=$(aws secretsmanager get-secret-value --secret-id "/multimodal-rag-kg/prod/openai-api-key" --query 'SecretString' --output text 2>/dev/null || echo "")
-        
-        if [ -z "$NEPTUNE_PASSWORD" ] || [ -z "$POSTGRESQL_PASSWORD" ]; then
-            print_error "Required secrets not found in AWS Secrets Manager. Please create them first."
-            exit 1
-        fi
-    else
-        # For non-production, prompt for secrets
-        print_warning "For non-production environments, you'll be prompted for sensitive values"
-        read -s -p "Enter Neptune master password: " NEPTUNE_PASSWORD
-        echo
-        read -s -p "Enter PostgreSQL password: " POSTGRESQL_PASSWORD
-        echo
-        read -s -p "Enter OpenAI API key (optional): " OPENAI_API_KEY
-        echo
-    fi
-    
-    # Export variables for Terraform
-    export TF_VAR_neptune_master_password="$NEPTUNE_PASSWORD"
-    export TF_VAR_postgresql_password="$POSTGRESQL_PASSWORD"
-    export TF_VAR_openai_api_key="$OPENAI_API_KEY"
-}
-
 # Function to deploy infrastructure
 deploy_infrastructure() {
     local env=$1
@@ -232,7 +196,6 @@ main() {
                 print_error "Terraform actions are not available for local environment"
                 exit 1
             fi
-            get_sensitive_variables "$environment"
             deploy_infrastructure "$environment" "$action"
             ;;
         "status")

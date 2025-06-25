@@ -22,7 +22,7 @@ class TestAPIIntegration:
             assert response.status_code == 200
             print("✅ API server is running and accessible")
         except requests.exceptions.ConnectionError:
-            pytest.skip("API server is not running. Start it with: python -m uvicorn src.api.handler:app --reload --host 0.0.0.0 --port 8000")
+            pytest.skip("API server is not running. Start it with: python -m uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000")
     
     def test_ingest_youtube_video(self):
         """Test ingesting a YouTube video and verify the expected output"""

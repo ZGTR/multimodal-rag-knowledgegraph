@@ -73,12 +73,6 @@ variable "neptune_master_username" {
   default     = "admin"
 }
 
-variable "neptune_master_password" {
-  description = "Neptune master password"
-  type        = string
-  sensitive   = true
-}
-
 # PostgreSQL variables
 variable "postgresql_db_name" {
   description = "PostgreSQL database name"
@@ -90,12 +84,6 @@ variable "postgresql_username" {
   description = "PostgreSQL username"
   type        = string
   default     = "postgres"
-}
-
-variable "postgresql_password" {
-  description = "PostgreSQL password"
-  type        = string
-  sensitive   = true
 }
 
 variable "postgresql_instance_class" {
@@ -145,11 +133,4 @@ variable "embedding_model_name" {
   description = "Embedding model name"
   type        = string
   default     = "text-embedding-3-small"
-}
-
-variable "openai_api_key" {
-  description = "OpenAI API key"
-  type        = string
-  sensitive   = true
-  default     = ""
 } 

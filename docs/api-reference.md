@@ -378,7 +378,7 @@ pytest tests/test_api_integration.py -v
 
 ```bash
 # Start the API server
-python -m uvicorn src.api.handler:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 
 # Test all endpoints
 curl -s "http://localhost:8000/entities" | jq '.'

@@ -15,17 +15,10 @@ A multimodal retrieval-augmented generation (RAG) system that ingests data from 
 ## Project Structure
 
 ```
-multimodal-rag-knowledgegraph/
-├── config/
-│   └── env/                    # Environment configuration files
-│       ├── example.env         # Template environment file
-│       ├── local.env           # Local development configuration
-│       └── README.md           # Environment configuration documentation
 ├── infra/                      # Infrastructure configuration
-│   ├── aws/                    # AWS-specific configurations
-│   │   ├── neptune_setup.sh    # Manual Neptune setup script
-│   │   └── neptune_cleanup.sh  # Neptune cleanup script
-│   ├── postgres/               # PostgreSQL Docker configuration
+│   ├── local-dev/              # Local development configurations
+│   │   ├── neptune/            # Neptune Docker setup
+│   │   └── postgres/           # PostgreSQL Docker configuration
 │   └── terraform/              # Terraform infrastructure as code
 │       ├── main.tf             # Main Terraform configuration
 │       ├── variables.tf        # Variable definitions
@@ -37,6 +30,8 @@ multimodal-rag-knowledgegraph/
 │       │   ├── alb/           # Application Load Balancer
 │       │   └── ecs/           # ECS cluster and service
 │       └── scripts/           # Deployment scripts
+├── scripts/                    # Utility scripts
+│   └── local-dev.sh           # Local development setup script
 ├── src/                        # Application source code
 ├── tests/                      # Test files
 ├── DEPLOYMENT_GUIDE.md         # Comprehensive deployment guide
@@ -45,7 +40,7 @@ multimodal-rag-knowledgegraph/
 
 ## 🚀 Quick Start
 
-### Local Development (Recommended for Development)
+### Local Development
 
 ```bash
 # Clone and setup
@@ -60,22 +55,15 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Configure environment
-cp config/env/example.env .env
-# Edit .env with your configuration
+# Configure environment variables
+# Option 1: Fetch from AWS Secrets Manager (if you have AWS access)
+./scripts/local-dev.sh dev
+
+# Option 2: Create .env file manually
+./scripts/local-dev.sh
 
 # Start the application
 uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### AWS Deployment (Recommended for Production)
-
-```bash
-# Deploy to development environment
-./infra/terraform/scripts/deploy.sh dev apply
-
-# Deploy to production environment
-./infra/terraform/scripts/deploy.sh prod apply
 ```
 
 For detailed deployment instructions, see [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md).
@@ -103,34 +91,62 @@ The system requires both a knowledge graph and vector database:
 docker run -d -p 8182:8182 tinkerpop/gremlin-server:latest
 
 # Start PostgreSQL with pgvector (Vector Database)
-docker compose -f infra/postgres/docker-compose.yml up -d
+docker compose -f infra/local-dev/postgres/docker-compose.yml up -d
 ```
 
 ### Step 2: Configure Environment
 
-Create a `.env` file based on the template:
+The project now uses AWS Secrets Manager for secure configuration management. For local development, you have several options:
+
+#### Option 1: Use Existing .env File (Recommended for Local Dev)
+
+Create a `.env` file in the project root with your local configuration:
 
 ```bash
-cp config/env/example.env .env
+# Copy the example file
+cp env.example .env
+
+# Edit .env with your actual values
+nano .env  # or use your preferred editor
 ```
 
-Update the `.env` file with your configuration:
-
+Your `.env` file should contain:
 ```env
-# App Environment
-APP_ENV=dev
+# Database Passwords
+NEPTUNE_PASSWORD=your-neptune-password
+POSTGRESQL_PASSWORD=your-postgresql-password
 
-# Knowledge Graph (Gremlin Server)
-KG_URI=ws://localhost:8182/gremlin
+# API Keys
+OPENAI_API_KEY=sk-your-openai-api-key
 
-# Vector Database (PostgreSQL with pgvector)
-VECTORDB_URI=postgresql://postgres:postgres@localhost:5432/vectordb
-
-# Embedding Model
+# Application Configuration
+APP_ENV=local
+LOG_LEVEL=debug
 EMBEDDING_MODEL_NAME=text-embedding-3-small
 
-# OpenAI API (optional for local dev - mock embeddings will be used if not set)
-OPENAI_API_KEY=your-openai-api-key
+# Local Database Connections
+VECTORDB_URI=postgresql://postgres:your-postgresql-password@localhost:5432/vectordb
+KG_URI=ws://localhost:8182/gremlin
+```
+
+**Note**: The `.env` file is already in `.gitignore` and won't be committed to version control.
+
+#### Option 2: Use AWS Secrets Manager
+
+If you have AWS access and secrets are already configured:
+
+```bash
+# Fetch secrets from AWS Secrets Manager for dev environment
+./scripts/local-dev.sh dev
+```
+
+#### Option 3: Interactive Setup
+
+If you don't have AWS access or want to create a new .env file:
+
+```bash
+# Create .env file with interactive prompts
+./scripts/local-dev.sh
 ```
 
 ### Step 3: Test the Setup

@@ -107,4 +107,4 @@ if __name__ == "__main__":
     else:
         print("\n🎉 Neptune is ready to use!")
         print("You can now run your application with:")
-        print("python -m uvicorn src.api.handler:app --reload --host 0.0.0.0 --port 8000") 
+        print("python -m uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000") 

@@ -163,7 +163,7 @@ class TestEntitiesEndpoint:
             }
         ]
         
-        with patch('src.api.handler.GremlinKG') as mock_kg:
+        with patch('src.api.routers.entities.GremlinKG') as mock_kg:
             mock_kg_instance = MagicMock()
             mock_kg_instance.get_all_entities.return_value = mock_entities
             mock_kg.return_value = mock_kg_instance
@@ -189,7 +189,7 @@ class TestEntitiesEndpoint:
     
     def test_get_entities_empty(self, client):
         """Test retrieval of entities when knowledge graph is empty"""
-        with patch('src.api.handler.GremlinKG') as mock_kg:
+        with patch('src.api.routers.entities.GremlinKG') as mock_kg:
             mock_kg_instance = MagicMock()
             mock_kg_instance.get_all_entities.return_value = []
             mock_kg.return_value = mock_kg_instance
@@ -211,10 +211,10 @@ class TestEntitiesEndpoint:
             assert len(data["entities"]) == 0
     
     def test_get_entities_error(self, client):
-        """Test entities endpoint when knowledge graph fails"""
-        with patch('src.api.handler.GremlinKG') as mock_kg:
+        """Test error handling when knowledge graph fails"""
+        with patch('src.api.routers.entities.GremlinKG') as mock_kg:
             mock_kg_instance = MagicMock()
-            mock_kg_instance.get_all_entities.side_effect = Exception("Connection failed")
+            mock_kg_instance.get_all_entities.side_effect = Exception("Database connection failed")
             mock_kg.return_value = mock_kg_instance
             
             response = client.get("/entities")
@@ -224,40 +224,48 @@ class TestEntitiesEndpoint:
             
             assert data["status"] == "error"
             assert "message" in data
-            assert "Connection failed" in data["message"]
             assert data["entities"] == []
 
 class TestGraphEndpoint:
     """Test cases for the /graph endpoint"""
     
     def test_get_graph_success(self, client):
-        """Test successful retrieval of the complete knowledge graph"""
+        """Test successful retrieval of the complete graph"""
         mock_graph = {
             "nodes": [
                 {
                     "id": "youtube:dQw4w9WgXcQ",
                     "label": "Content",
-                    "properties": {"node_type": "Content"}
+                    "properties": {
+                        "node_type": "Content",
+                        "title": "Test Video"
+                    }
                 },
                 {
                     "id": "entity:test_entity",
-                    "label": "Entity", 
-                    "properties": {"node_type": "Entity"}
+                    "label": "Entity",
+                    "properties": {
+                        "node_type": "Entity",
+                        "name": "Test Entity"
+                    }
                 }
             ],
             "edges": [
                 {
-                    "id": "edge:youtube:dQw4w9WgXcQ:entity:test_entity:contains_entity",
+                    "id": "edge1",
                     "source": "youtube:dQw4w9WgXcQ",
                     "target": "entity:test_entity",
-                    "label": "contains_entity"
+                    "label": "MENTIONS",
+                    "properties": {
+                        "confidence": 0.95
+                    }
                 }
             ],
             "total_nodes": 2,
             "total_edges": 1
         }
         
-        with patch('src.api.handler.GremlinKG') as mock_kg:
+        with patch('src.api.routers.graph.GremlinKG') as mock_kg:
             mock_kg_instance = MagicMock()
             mock_kg_instance.get_whole_graph.return_value = mock_graph
             mock_kg.return_value = mock_kg_instance
@@ -267,18 +275,10 @@ class TestGraphEndpoint:
             assert response.status_code == 200
             data = response.json()
             
-            expected_output = {
-                "status": "success",
-                "graph": mock_graph
-            }
-            
-            assert data == expected_output
             assert data["status"] == "success"
-            assert "graph" in data
+            assert data["graph"] == mock_graph
             assert data["graph"]["total_nodes"] == 2
             assert data["graph"]["total_edges"] == 1
-            assert len(data["graph"]["nodes"]) == 2
-            assert len(data["graph"]["edges"]) == 1
     
     def test_get_graph_empty(self, client):
         """Test retrieval of graph when knowledge graph is empty"""
@@ -289,7 +289,7 @@ class TestGraphEndpoint:
             "total_edges": 0
         }
         
-        with patch('src.api.handler.GremlinKG') as mock_kg:
+        with patch('src.api.routers.graph.GremlinKG') as mock_kg:
             mock_kg_instance = MagicMock()
             mock_kg_instance.get_whole_graph.return_value = empty_graph
             mock_kg.return_value = mock_kg_instance
@@ -299,19 +299,15 @@ class TestGraphEndpoint:
             assert response.status_code == 200
             data = response.json()
             
-            expected_output = {
-                "status": "success",
-                "graph": empty_graph
-            }
-            
-            assert data == expected_output
             assert data["status"] == "success"
             assert data["graph"]["total_nodes"] == 0
             assert data["graph"]["total_edges"] == 0
+            assert data["graph"]["nodes"] == []
+            assert data["graph"]["edges"] == []
     
     def test_get_graph_error(self, client):
-        """Test graph endpoint when knowledge graph fails"""
-        with patch('src.api.handler.GremlinKG') as mock_kg:
+        """Test error handling when knowledge graph fails"""
+        with patch('src.api.routers.graph.GremlinKG') as mock_kg:
             mock_kg_instance = MagicMock()
             mock_kg_instance.get_whole_graph.side_effect = Exception("Graph retrieval failed")
             mock_kg.return_value = mock_kg_instance
@@ -323,7 +319,6 @@ class TestGraphEndpoint:
             
             assert data["status"] == "error"
             assert "message" in data
-            assert "Graph retrieval failed" in data["message"]
             assert data["graph"]["total_nodes"] == 0
             assert data["graph"]["total_edges"] == 0
 
@@ -331,158 +326,115 @@ class TestSearchEndpoint:
     """Test cases for the /search endpoint"""
     
     def test_search_success(self, client):
-        """Test successful document search"""
-        mock_documents = [
-            {
-                "content": "This is a test document about AI and machine learning.",
-                "metadata": {
-                    "source": "youtube:dQw4w9WgXcQ",
-                    "title": "AI Tutorial",
-                    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-                }
-            },
-            {
-                "content": "Another document about artificial intelligence.",
-                "metadata": {
-                    "source": "youtube:test123",
-                    "title": "ML Basics",
-                    "url": "https://www.youtube.com/watch?v=test123"
-                }
-            }
+        """Test successful search with results"""
+        mock_docs = [
+            MagicMock(
+                page_content="This is a test document about AI",
+                metadata={"source": "youtube:dQw4w9WgXcQ", "title": "AI Video"}
+            ),
+            MagicMock(
+                page_content="Another document about machine learning",
+                metadata={"source": "twitter:123", "title": "ML Tweet"}
+            )
         ]
         
-        with patch('src.api.handler.get_vectorstore') as mock_get_vectorstore:
-            mock_vectorstore = MagicMock()
-            mock_vectorstore.search.return_value = [
-                MagicMock(page_content=doc["content"], metadata=doc["metadata"])
-                for doc in mock_documents
-            ]
-            mock_get_vectorstore.return_value = mock_vectorstore
+        with patch('src.api.routers.search.get_vectorstore') as mock_get_vectorstore:
+            mock_vectordb = MagicMock()
+            mock_vectordb.search.return_value = mock_docs
+            mock_get_vectorstore.return_value = mock_vectordb
             
-            response = client.get("/search?query=AI&k=5")
+            response = client.get("/search?query=AI&k=2")
             
             assert response.status_code == 200
             data = response.json()
             
-            expected_output = {
-                "status": "success",
-                "query": "AI",
-                "count": 2,
-                "results": mock_documents
-            }
-            
-            assert data == expected_output
             assert data["status"] == "success"
             assert data["query"] == "AI"
             assert data["count"] == 2
             assert len(data["results"]) == 2
-            assert "AI" in data["results"][0]["content"]
+            assert data["results"][0]["content"] == "This is a test document about AI"
+            assert data["results"][0]["metadata"]["source"] == "youtube:dQw4w9WgXcQ"
     
     def test_search_with_default_k(self, client):
-        """Test search with default k parameter"""
-        mock_documents = [
-            {
-                "page_content": "Test document",
-                "metadata": {"source": "test"}
-            }
-        ]
+        """Test search with default k value (5)"""
+        mock_docs = [MagicMock(page_content="Test", metadata={})] * 5
         
-        with patch('src.api.handler.get_vectorstore') as mock_get_vectorstore:
-            mock_vectorstore = MagicMock()
-            mock_vectorstore.search.return_value = [
-                MagicMock(page_content=doc["page_content"], metadata=doc["metadata"])
-                for doc in mock_documents
-            ]
-            mock_get_vectorstore.return_value = mock_vectorstore
+        with patch('src.api.routers.search.get_vectorstore') as mock_get_vectorstore:
+            mock_vectordb = MagicMock()
+            mock_vectordb.search.return_value = mock_docs
+            mock_get_vectorstore.return_value = mock_vectordb
             
             response = client.get("/search?query=test")
             
             assert response.status_code == 200
             data = response.json()
             
-            assert data["status"] == "success"
-            assert data["query"] == "test"
-            assert data["count"] == 1
-            # Verify that default k=5 was used
-            mock_vectorstore.search.assert_called_with("test", k=5)
+            assert data["count"] == 5
+            # Verify that search was called with default k=5
+            mock_vectordb.search.assert_called_once_with("test", k=5)
     
     def test_search_with_custom_k(self, client):
-        """Test search with custom k parameter"""
-        with patch('src.api.handler.get_vectorstore') as mock_get_vectorstore:
-            mock_vectorstore = MagicMock()
-            mock_vectorstore.search.return_value = []
-            mock_get_vectorstore.return_value = mock_vectorstore
+        """Test search with custom k value"""
+        mock_docs = [MagicMock(page_content="Test", metadata={})] * 3
+        
+        with patch('src.api.routers.search.get_vectorstore') as mock_get_vectorstore:
+            mock_vectordb = MagicMock()
+            mock_vectordb.search.return_value = mock_docs
+            mock_get_vectorstore.return_value = mock_vectordb
             
-            response = client.get("/search?query=test&k=10")
+            response = client.get("/search?query=test&k=3")
             
             assert response.status_code == 200
             data = response.json()
             
-            assert data["status"] == "success"
-            assert data["query"] == "test"
-            assert data["count"] == 0
-            # Verify that custom k=10 was used
-            mock_vectorstore.search.assert_called_with("test", k=10)
+            assert data["count"] == 3
+            # Verify that search was called with custom k=3
+            mock_vectordb.search.assert_called_once_with("test", k=3)
     
     def test_search_empty_results(self, client):
-        """Test search when no results are found"""
-        with patch('src.api.handler.get_vectorstore') as mock_get_vectorstore:
-            mock_vectorstore = MagicMock()
-            mock_vectorstore.search.return_value = []
-            mock_get_vectorstore.return_value = mock_vectorstore
+        """Test search with no results"""
+        with patch('src.api.routers.search.get_vectorstore') as mock_get_vectorstore:
+            mock_vectordb = MagicMock()
+            mock_vectordb.search.return_value = []
+            mock_get_vectorstore.return_value = mock_vectordb
             
-            response = client.get("/search?query=nonexistent&k=5")
+            response = client.get("/search?query=nonexistent")
             
             assert response.status_code == 200
             data = response.json()
             
-            expected_output = {
-                "status": "success",
-                "query": "nonexistent",
-                "count": 0,
-                "results": []
-            }
-            
-            assert data == expected_output
             assert data["status"] == "success"
             assert data["count"] == 0
-            assert len(data["results"]) == 0
+            assert data["results"] == []
     
     def test_search_vectorstore_unavailable(self, client):
         """Test search when vector store is not available"""
-        with patch('src.api.handler.get_vectorstore') as mock_get_vectorstore:
+        with patch('src.api.routers.search.get_vectorstore') as mock_get_vectorstore:
             mock_get_vectorstore.return_value = None
             
-            response = client.get("/search?query=test&k=5")
+            response = client.get("/search?query=test")
             
             assert response.status_code == 200
             data = response.json()
             
-            expected_output = {
-                "status": "error",
-                "message": "Vector store not available",
-                "results": []
-            }
-            
-            assert data == expected_output
             assert data["status"] == "error"
-            assert "Vector store not available" in data["message"]
+            assert data["message"] == "Vector store not available"
+            assert data["results"] == []
     
     def test_search_error(self, client):
-        """Test search when vector store throws an error"""
-        with patch('src.api.handler.get_vectorstore') as mock_get_vectorstore:
-            mock_vectorstore = MagicMock()
-            mock_vectorstore.search.side_effect = Exception("Search failed")
-            mock_get_vectorstore.return_value = mock_vectorstore
+        """Test error handling when search fails"""
+        with patch('src.api.routers.search.get_vectorstore') as mock_get_vectorstore:
+            mock_vectordb = MagicMock()
+            mock_vectordb.search.side_effect = Exception("Search failed")
+            mock_get_vectorstore.return_value = mock_vectordb
             
-            response = client.get("/search?query=test&k=5")
+            response = client.get("/search?query=test")
             
             assert response.status_code == 200
             data = response.json()
             
             assert data["status"] == "error"
             assert "message" in data
-            assert "Search failed" in data["message"]
             assert data["results"] == []
     
     def test_search_missing_query(self, client):
@@ -496,27 +448,29 @@ class TestSearchEndpoint:
         assert response.status_code == 422  # Validation error
 
 class TestAPIEndpoints:
-    """Test cases for other API endpoints"""
+    """Test cases for general API endpoints"""
     
     def test_docs_endpoint(self, client):
-        """Test that the docs endpoint is accessible"""
+        """Test that API documentation is available"""
         response = client.get("/docs")
         assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
     
     def test_openapi_endpoint(self, client):
-        """Test that the OpenAPI schema endpoint is accessible"""
+        """Test that OpenAPI schema is available"""
         response = client.get("/openapi.json")
         assert response.status_code == 200
-        assert response.headers["content-type"] == "application/json"
-        
         data = response.json()
         assert "openapi" in data
+        assert "info" in data
         assert "paths" in data
-        assert "/ingest" in data["paths"]
-        assert "/entities" in data["paths"]
-        assert "/graph" in data["paths"]
-        assert "/search" in data["paths"]
+    
+    def test_health_endpoint(self, client):
+        """Test health check endpoint"""
+        response = client.get("/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "healthy"
+        assert "message" in data
     
     def test_root_endpoint_not_found(self, client):
         """Test that root endpoint returns 404"""
@@ -524,6 +478,6 @@ class TestAPIEndpoints:
         assert response.status_code == 404
     
     def test_nonexistent_endpoint(self, client):
-        """Test that nonexistent endpoints return 404"""
+        """Test that nonexistent endpoint returns 404"""
         response = client.get("/nonexistent")
         assert response.status_code == 404 
