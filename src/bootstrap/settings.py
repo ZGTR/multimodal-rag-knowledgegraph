@@ -30,8 +30,12 @@ class Settings(BaseSettings):
     NEPTUNE_REGION: str = "us-east-1"
     NEPTUNE_USE_SSL: bool = True
     NEPTUNE_VERIFY_SSL: bool = True
+    neptune_password: str | None = None
     
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
+    # PostgreSQL Configuration
+    postgresql_password: str | None = None
+    
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
 settings = Settings()
 logger.info(f"Settings loaded: app_env={settings.app_env}, vectordb_uri={settings.vectordb_uri}, kg_uri={settings.kg_uri}")

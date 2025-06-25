@@ -2,9 +2,10 @@ import pandas as pd
 from sqlalchemy import create_engine
 import umap
 import matplotlib.pyplot as plt
-from src.config.settings import settings
+from src.bootstrap.settings import get_settings
 
 def load_monthly_centroids():
+    settings = get_settings()
     engine = create_engine(settings.vectordb_uri)
     query = """
     SELECT date_trunc('month', created_at) AS month,

@@ -2,6 +2,7 @@
 fastapi==0.115.13
 uvicorn==0.34.3
 pydantic==2.11.7
+pydantic-settings==2.4.0
 
 # Data ingestion dependencies
 youtube-transcript-api==1.1.0
@@ -13,8 +14,15 @@ yt-dlp==2025.6.9
 langchain==0.3.26
 langchain-community==0.3.26
 langchain-openai==0.3.25
+langchain-chat-openai==0.1.12
 openai==1.91.0
 psycopg2-binary==2.9.10
+
+# Analytics dependencies
+pandas==2.2.3
+sqlalchemy==2.0.34
+umap-learn==0.6.3
+matplotlib==3.9.1
 
 # Testing dependencies
 pytest==8.4.1

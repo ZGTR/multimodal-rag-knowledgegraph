@@ -1,9 +1,10 @@
 from langchain.chains import RetrievalQA
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from .vector_store import get_vectorstore
-from src.config.settings import settings
+from src.bootstrap.settings import get_settings
 
 def build_rag_chain():
+    settings = get_settings()
     vectordb = get_vectorstore()
     retriever = vectordb.as_retriever()
     llm = ChatOpenAI(
