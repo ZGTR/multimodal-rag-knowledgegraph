@@ -1,6 +1,6 @@
 # Multimodal RAG with Knowledge Graph
 
-This is a lightweight experimentation repo for multimodal retrieval-augmented generation (RAG) system that ingests data from YouTube, Twitter, and Instagram, stores embeddings in a vector database, and builds a knowledge graph using Gremlin.
+This is a lightweight experimentation repo for multimodal RAG system that ingests data from YouTube, Twitter, and Instagram, stores embeddings in a vector database, and builds a knowledge graph using Gremlin.
 
 This is not aimed to be prod-ready (though it can be). Albeit, we have to move the Neptune and Postgres deployments to other repos to correctly manage their IaC, add tests, follow DDD principles, etc. 
 
